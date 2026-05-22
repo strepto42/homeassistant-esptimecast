@@ -1,0 +1,89 @@
+send_message:
+  target:
+    device:
+      integration: esptimecast
+  fields:
+    message:
+      required: true
+      example: "HELLO WORLD"
+      selector:
+        text:
+    speed:
+      example: 80
+      selector:
+        number:
+          min: 10
+          max: 200
+          mode: box
+    scrolls:
+      example: 3
+      selector:
+        number:
+          min: 0
+          max: 100
+          mode: box
+    seconds:
+      example: 15
+      selector:
+        number:
+          min: 0
+          max: 3600
+          mode: box
+    big_numbers:
+      selector:
+        boolean:
+    interrupt:
+      selector:
+        boolean:
+
+start_timer:
+  target:
+    device:
+      integration: esptimecast
+  fields:
+    duration:
+      required: true
+      example: "5M"
+      selector:
+        text:
+
+start_pomodoro:
+  target:
+    device:
+      integration: esptimecast
+  fields:
+    spec:
+      required: true
+      example: "25-5-15"
+      selector:
+        text:
+
+start_stopwatch:
+  target:
+    device:
+      integration: esptimecast
+
+go_to_mode:
+  target:
+    device:
+      integration: esptimecast
+  fields:
+    mode:
+      required: true
+      example: "clock"
+      selector:
+        select:
+          options:
+            - clock
+            - weather
+            - weather_desc
+            - countdown
+            - nightscout
+            - date
+            - message
+            - timer
+
+clear_message:
+  target:
+    device:
+      integration: esptimecast
