@@ -41,10 +41,15 @@ press **Save settings to device** to persist them. A few toggles (day-of-week,
 animated seconds, weather description) cannot be read back from the device, so
 those switches hold the last value you set.
 
-Settings that can only be applied via the device's `/save` (which reboots it) —
-clock/weather durations, dimming schedule, countdown date/time, hostname, NTP
-servers, timezone — will be exposed through a **Configure** dialog in a future
-release; use the device's web UI for those for now.
+### Configure dialog
+
+Settings that the device can only apply via `/save` (which reboots it, ~10–20s)
+are in the integration's **Configure** dialog (Settings → Devices & Services →
+ESPTimeCast → Configure): time zone, clock/weather durations, NTP servers,
+hostname, OpenWeather API key & location, the dimming schedule, and the
+countdown date/time/label. Wi-Fi credentials are intentionally not configurable
+here — changing them would move the device off your network. Use the device's
+own web UI for Wi-Fi.
 
 ## Installation (HACS)
 

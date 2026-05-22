@@ -73,7 +73,14 @@ class ESPTimeCastSelect(ESPTimeCastEntity, SelectEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        self._optimistic = None
+        # Release the optimistic value only once the device confirms it, so a
+        # poll landing before the change applies doesn't revert the selection.
+        if (
+            self._optimistic is not None
+            and self.entity_description.current_fn(self.coordinator.data)
+            == self._optimistic
+        ):
+            self._optimistic = None
         super()._handle_coordinator_update()
 
     @property
