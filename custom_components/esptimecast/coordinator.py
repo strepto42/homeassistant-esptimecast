@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import ESPTimeCastClient, ESPTimeCastError, Status
+from .api import DeviceData, ESPTimeCastClient, ESPTimeCastError
 from .const import CONF_HOST, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,8 +17,8 @@ _LOGGER = logging.getLogger(__name__)
 type ESPTimeCastConfigEntry = ConfigEntry[ESPTimeCastCoordinator]
 
 
-class ESPTimeCastCoordinator(DataUpdateCoordinator[Status]):
-    """Polls a single ESPTimeCast device's /status endpoint."""
+class ESPTimeCastCoordinator(DataUpdateCoordinator[DeviceData]):
+    """Polls a device's live state (/status) and settings (/config.json)."""
 
     config_entry: ESPTimeCastConfigEntry
 
@@ -39,8 +39,8 @@ class ESPTimeCastCoordinator(DataUpdateCoordinator[Status]):
             session=async_get_clientsession(hass),
         )
 
-    async def _async_update_data(self) -> Status:
+    async def _async_update_data(self) -> DeviceData:
         try:
-            return await self.client.get_status()
+            return await self.client.get_device_data()
         except ESPTimeCastError as err:
             raise UpdateFailed(f"Error communicating with device: {err}") from err

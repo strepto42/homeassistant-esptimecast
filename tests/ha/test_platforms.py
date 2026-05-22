@@ -50,9 +50,46 @@ async def test_binary_sensors(
     hass: HomeAssistant, mock_client, mock_config_entry
 ) -> None:
     await _setup(hass, mock_config_entry)
-    assert hass.states.get("binary_sensor.esptimecast_local_display").state == STATE_ON
     assert (
         hass.states.get("binary_sensor.esptimecast_local_time_synced").state == STATE_ON
+    )
+    # The redundant display binary_sensor was removed (covered by the switch).
+    assert hass.states.get("binary_sensor.esptimecast_local_display") is None
+
+
+async def test_custom_message_text_entity(
+    hass: HomeAssistant, mock_client, mock_config_entry
+) -> None:
+    await _setup(hass, mock_config_entry)
+    entity_id = "text.esptimecast_local_custom_message"
+    state = hass.states.get(entity_id)
+    assert state is not None
+
+    with patch(
+        "custom_components.esptimecast.api.ESPTimeCastClient.display_message",
+        new=AsyncMock(),
+    ) as mock_msg:
+        await hass.services.async_call(
+            "text",
+            "set_value",
+            {ATTR_ENTITY_ID: entity_id, "value": "HELLO HA"},
+            blocking=True,
+        )
+    mock_msg.assert_awaited_once_with("HELLO HA")
+
+
+async def test_new_switches_present_and_state_from_config(
+    hass: HomeAssistant, mock_client, mock_config_entry
+) -> None:
+    await _setup(hass, mock_config_entry)
+    # colon_blink is True in the config fixture; show_day_of_week is False.
+    assert hass.states.get("switch.esptimecast_local_blinking_colon").state == STATE_ON
+    assert (
+        hass.states.get("switch.esptimecast_local_show_day_of_week").state == STATE_OFF
+    )
+    assert (
+        hass.states.get("switch.esptimecast_local_show_weather_description").state
+        == STATE_ON
     )
 
 

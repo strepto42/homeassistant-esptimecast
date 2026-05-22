@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.esptimecast.api import Status
+from custom_components.esptimecast.api import DeviceData, FullConfig, Status
 from custom_components.esptimecast.const import CONF_HOST, DOMAIN
 
 
@@ -31,16 +31,37 @@ def status_obj(status_payload: dict) -> Status:
 
 
 @pytest.fixture
-def mock_client(status_obj: Status) -> Generator[AsyncMock]:
+def config_obj(config_payload: dict) -> FullConfig:
+    """A parsed FullConfig object from the captured fixture."""
+    return FullConfig.from_dict(config_payload)
+
+
+@pytest.fixture
+def device_data(status_obj: Status, config_obj: FullConfig) -> DeviceData:
+    """Combined coordinator data."""
+    return DeviceData(status=status_obj, config=config_obj)
+
+
+@pytest.fixture
+def mock_client(status_obj: Status, device_data: DeviceData) -> Generator[AsyncMock]:
     """Patch the API client so no network access occurs.
 
-    Patches the class methods used by both the coordinator and the config flow.
+    Patches the class methods used by both the coordinator (get_device_data)
+    and the config flow (get_status).
     """
     with (
         patch(
+            "custom_components.esptimecast.api.ESPTimeCastClient.get_device_data",
+            new=AsyncMock(return_value=device_data),
+        ) as get_device_data,
+        patch(
             "custom_components.esptimecast.api.ESPTimeCastClient.get_status",
             new=AsyncMock(return_value=status_obj),
-        ) as get_status,
+        ),
+        patch(
+            "custom_components.esptimecast.api.ESPTimeCastClient.get_config",
+            new=AsyncMock(return_value=device_data.config),
+        ),
         patch(
             "custom_components.esptimecast.api.ESPTimeCastClient.get_version",
             new=AsyncMock(return_value={"version": "1.6.0", "board": "esp32"}),
@@ -49,12 +70,8 @@ def mock_client(status_obj: Status) -> Generator[AsyncMock]:
             "custom_components.esptimecast.api.ESPTimeCastClient._request",
             new=AsyncMock(return_value="OK"),
         ),
-        patch(
-            "custom_components.esptimecast.api.ESPTimeCastClient._get_json",
-            new=AsyncMock(return_value=status_obj.raw),
-        ),
     ):
-        yield get_status
+        yield get_device_data
 
 
 @pytest.fixture

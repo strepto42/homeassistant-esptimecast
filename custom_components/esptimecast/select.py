@@ -11,7 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .api import ESPTimeCastClient, Status
+from .api import DeviceData, ESPTimeCastClient
 from .const import DISPLAY_MODES, LANGUAGES, UNITS
 from .coordinator import ESPTimeCastConfigEntry, ESPTimeCastCoordinator
 from .entity import ESPTimeCastEntity
@@ -21,7 +21,7 @@ from .entity import ESPTimeCastEntity
 class ESPTimeCastSelectDescription(SelectEntityDescription):
     """Describes an ESPTimeCast select."""
 
-    current_fn: Callable[[Status], str | None]
+    current_fn: Callable[[DeviceData], str | None]
     select_fn: Callable[[ESPTimeCastClient, str], Awaitable[Any]]
 
 
@@ -30,7 +30,7 @@ SELECTS: tuple[ESPTimeCastSelectDescription, ...] = (
         key="display_mode",
         translation_key="display_mode",
         options=list(DISPLAY_MODES),
-        current_fn=lambda s: s.mode if s.mode in DISPLAY_MODES else None,
+        current_fn=lambda d: d.status.mode if d.status.mode in DISPLAY_MODES else None,
         select_fn=lambda c, option: c.go_to_mode(option),
     ),
     ESPTimeCastSelectDescription(
@@ -38,7 +38,7 @@ SELECTS: tuple[ESPTimeCastSelectDescription, ...] = (
         translation_key="language",
         entity_category=EntityCategory.CONFIG,
         options=list(LANGUAGES),
-        current_fn=lambda s: s.config.language,
+        current_fn=lambda d: d.config.language,
         select_fn=lambda c, option: c.set_language(option),
     ),
     ESPTimeCastSelectDescription(
@@ -46,7 +46,7 @@ SELECTS: tuple[ESPTimeCastSelectDescription, ...] = (
         translation_key="units",
         entity_category=EntityCategory.CONFIG,
         options=list(UNITS),
-        current_fn=lambda s: s.config.weather_units,
+        current_fn=lambda d: d.config.weather_units,
         select_fn=lambda c, option: c.set_units(option),
     ),
 )

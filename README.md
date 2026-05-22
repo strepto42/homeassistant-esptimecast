@@ -12,22 +12,31 @@ controls as native Home Assistant entities, plus services for messages and timer
 
 ## Features
 
-- **Local polling** of `GET /status` (default every 30 s).
+- **Local polling** of `GET /status` (live state) and `GET /config.json`
+  (full settings), default every 30 s.
 - **Zeroconf discovery** — devices on your network are offered automatically.
 - Entities:
-  - **Sensors:** temperature, humidity, weather description, signal strength,
-    uptime, current mode, current message, sunrise/sunset, countdown, glucose
-    (when Nightscout is enabled).
-  - **Binary sensors:** display on/off, time synced, display busy, dimming active.
-  - **Switches:** display, flip, 12-hour, show date / day-of-week / humidity,
-    weather description, countdown, dramatic countdown, colon blink, dimming.
-  - **Numbers:** brightness, clock duration, weather duration.
-  - **Selects:** language, units (metric/imperial), display mode.
+  - **Text:** custom message — type to scroll a message on the display, clear
+    to remove it (mirrors the web UI's Custom Message box).
+  - **Sensors:** temperature, humidity, weather description, signal strength
+    (diagnostic), uptime (diagnostic); countdown remaining (when a countdown is
+    set) and glucose (when Nightscout is active).
+  - **Binary sensors:** time synced, display busy, dimming active (and glucose
+    outdated when Nightscout is active) — all diagnostic.
+  - **Switches:** display, flip, 12-hour, show day-of-week, show date,
+    show humidity, blinking colon, show weather description, countdown,
+    dramatic countdown, clock-only-during-dimming, hide donation message.
+  - **Number:** brightness.
+  - **Selects:** display mode, language, units (metric/imperial).
   - **Buttons:** restart, next/previous mode, save config, stop timer/stopwatch,
-    restart pomodoro.
-  - **Notify:** push a scrolling message to the display.
+    restart pomodoro, clear message.
+  - **Notify:** push a scrolling message (with advanced options) to the display.
 - **Services:** `send_message`, `start_timer`, `start_pomodoro`, `start_stopwatch`,
   `go_to_mode`, `clear_message`.
+
+Settings that require a device reboot to apply (clock/weather durations, dimming
+schedule, countdown date/time, hostname, NTP servers, timezone) are handled
+separately and not yet exposed; use the device's web UI for those for now.
 
 ## Installation (HACS)
 

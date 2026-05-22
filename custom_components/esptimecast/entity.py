@@ -20,7 +20,8 @@ class ESPTimeCastEntity(CoordinatorEntity[ESPTimeCastCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        status = self.coordinator.data
+        data = self.coordinator.data
+        status = data.status if data else None
         entry = self.coordinator.config_entry
         return DeviceInfo(
             identifiers={(DOMAIN, entry.unique_id or entry.entry_id)},

@@ -31,7 +31,7 @@ async def test_setup_retry_on_connection_error(
 ) -> None:
     mock_config_entry.add_to_hass(hass)
     with patch(
-        "custom_components.esptimecast.api.ESPTimeCastClient.get_status",
+        "custom_components.esptimecast.api.ESPTimeCastClient.get_device_data",
         new=AsyncMock(side_effect=ESPTimeCastConnectionError("down")),
     ):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)

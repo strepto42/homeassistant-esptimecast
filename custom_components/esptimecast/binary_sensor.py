@@ -14,7 +14,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .api import Status
+from .api import DeviceData
 from .coordinator import ESPTimeCastConfigEntry, ESPTimeCastCoordinator
 from .entity import ESPTimeCastEntity
 
@@ -23,44 +23,39 @@ from .entity import ESPTimeCastEntity
 class ESPTimeCastBinarySensorDescription(BinarySensorEntityDescription):
     """Describes an ESPTimeCast binary sensor."""
 
-    value_fn: Callable[[Status], bool]
+    value_fn: Callable[[DeviceData], bool]
 
 
 BINARY_SENSORS: tuple[ESPTimeCastBinarySensorDescription, ...] = (
-    ESPTimeCastBinarySensorDescription(
-        key="display_on",
-        translation_key="display_on",
-        device_class=BinarySensorDeviceClass.LIGHT,
-        value_fn=lambda s: not s.display_off,
-    ),
     ESPTimeCastBinarySensorDescription(
         key="time_synced",
         translation_key="time_synced",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda s: s.time_synced,
+        value_fn=lambda d: d.status.time_synced,
     ),
     ESPTimeCastBinarySensorDescription(
         key="display_busy",
         translation_key="display_busy",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda s: s.display_busy,
+        value_fn=lambda d: d.status.display_busy,
     ),
     ESPTimeCastBinarySensorDescription(
         key="dimming_active",
         translation_key="dimming_active",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda s: s.dimming.enabled,
+        value_fn=lambda d: d.status.dimming.enabled,
     ),
-    ESPTimeCastBinarySensorDescription(
-        key="glucose_outdated",
-        translation_key="glucose_outdated",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        value_fn=lambda s: s.nightscout.active and s.nightscout.is_outdated,
-    ),
+)
+
+# Created only when Nightscout is active.
+GLUCOSE_OUTDATED = ESPTimeCastBinarySensorDescription(
+    key="glucose_outdated",
+    translation_key="glucose_outdated",
+    device_class=BinarySensorDeviceClass.PROBLEM,
+    entity_category=EntityCategory.DIAGNOSTIC,
+    value_fn=lambda d: d.status.nightscout.is_outdated,
 )
 
 
@@ -71,9 +66,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up ESPTimeCast binary sensors."""
     coordinator = entry.runtime_data
+    descriptions = list(BINARY_SENSORS)
+    if coordinator.data.status.nightscout.active:
+        descriptions.append(GLUCOSE_OUTDATED)
     async_add_entities(
         ESPTimeCastBinarySensor(coordinator, description)
-        for description in BINARY_SENSORS
+        for description in descriptions
     )
 
 
