@@ -14,6 +14,8 @@ Device API reference (firmware 1.6.0, port 80, no auth):
 
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field
 from datetime import time
 from typing import Any
@@ -23,8 +25,10 @@ import aiohttp
 DEFAULT_PORT = 80
 DEFAULT_TIMEOUT = 10.0
 
-# Form-feed glyph the firmware prepends to the weather description as an icon.
-_ICON_PREFIX = "\f"
+# The firmware prefixes the weather description with an icon glyph encoded as a
+# raw control character (the specific byte varies per icon, e.g. 0x0c for clear
+# sky, 0x10 for rain). Strip all control characters from display strings.
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 
 # Masked secret marker used by the firmware in /status.config.
 _MASKED = "***HIDDEN***"
@@ -95,11 +99,14 @@ class Weather:
     def from_dict(cls, data: dict[str, Any]) -> Weather:
         desc = data.get("weatherDescription")
         if isinstance(desc, str):
-            desc = desc.replace(_ICON_PREFIX, "").strip() or None
+            desc = _CONTROL_CHARS.sub("", desc).strip() or None
+        icon = data.get("icon")
+        if isinstance(icon, str):
+            icon = _CONTROL_CHARS.sub("", icon).strip() or None
         return cls(
             temperature=_to_float(data.get("currentTemperature")),
             description=desc,
-            icon=data.get("icon") or None,
+            icon=icon,
             humidity=_to_int(data.get("currentHumidity")),
             sunrise=_hm_to_time(data.get("sunriseHour"), data.get("sunriseMinute")),
             sunset=_hm_to_time(data.get("sunsetHour"), data.get("sunsetMinute")),
@@ -350,14 +357,23 @@ class ESPTimeCastClient:
             async with self._session.get(url, timeout=self._timeout) as resp:
                 if resp.status >= 400:
                     raise ESPTimeCastError(f"HTTP {resp.status} for GET {path}")
-                # Firmware sends JSON but not always with a JSON content-type.
-                return await resp.json(content_type=None)
+                text = await resp.text()
         except TimeoutError as err:
             raise ESPTimeCastTimeoutError(f"Timeout for GET {path}") from err
         except aiohttp.ClientError as err:
             raise ESPTimeCastConnectionError(
                 f"Connection error for GET {path}: {err}"
             ) from err
+        # The firmware embeds raw control characters (e.g. a form-feed icon
+        # glyph) inside JSON strings. That is invalid per the JSON spec and is
+        # rejected by strict parsers such as orjson (which Home Assistant uses
+        # for resp.json()). Parse leniently with strict=False so polling does
+        # not crash.
+        try:
+            data: dict[str, Any] = json.loads(text, strict=False)
+        except json.JSONDecodeError as err:
+            raise ESPTimeCastError(f"Invalid JSON from GET {path}: {err}") from err
+        return data
 
     # -- read API ----------------------------------------------------------
 
