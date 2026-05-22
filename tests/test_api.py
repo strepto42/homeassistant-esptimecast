@@ -148,6 +148,28 @@ async def test_get_status_tolerates_raw_control_chars(client):
     assert status.weather.icon is None  # control-only glyph reduces to nothing
 
 
+async def test_get_status_tolerates_invalid_utf8(client):
+    # The firmware can emit raw non-UTF-8 bytes (e.g. 0xa8) as icon/symbol
+    # glyphs inside the JSON. resp.text() would raise UnicodeDecodeError, so the
+    # client must decode the raw bytes leniently and still parse.
+    raw_bytes = (
+        b'{"id":"esptimecast","mode":"weather","brightness":3,'
+        b'"weather":{"weatherDescription":"\xa8 CLEAR SKY","icon":"\xa8",'
+        b'"currentTemperature":22}}'
+    )
+    with aioresponses() as m:
+        m.get(
+            "http://esptimecast.local/status",
+            body=raw_bytes,
+            content_type="application/json",
+        )
+        status = await client.get_status()
+    assert status.mode == "weather"
+    assert status.weather.temperature == 22
+    assert status.weather.description == "CLEAR SKY"
+    assert status.weather.icon is None
+
+
 # --- get_config (full /config.json) -----------------------------------------
 
 

@@ -1,6 +1,6 @@
 [project]
 name = "homeassistant-esptimecast"
-version = "0.3.0"
+version = "0.3.1"
 description = "Home Assistant integration for ESPTimeCast LED matrix clock & weather displays."
 readme = "README.md"
 requires-python = ">=3.13"

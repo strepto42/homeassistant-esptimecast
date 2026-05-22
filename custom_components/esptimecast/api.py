@@ -26,9 +26,10 @@ DEFAULT_PORT = 80
 DEFAULT_TIMEOUT = 10.0
 
 # The firmware prefixes the weather description with an icon glyph encoded as a
-# raw control character (the specific byte varies per icon, e.g. 0x0c for clear
-# sky, 0x10 for rain). Strip all control characters from display strings.
-_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+# raw byte (the specific byte varies per icon, e.g. 0x0c for clear sky, 0x10 for
+# rain, or non-UTF-8 high bytes like 0xa8). Strip control characters and the
+# U+FFFD replacement char (what undecodable bytes become) from display strings.
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f\ufffd]")
 
 # Masked secret marker used by the firmware in /status.config.
 _MASKED = "***HIDDEN***"
@@ -472,18 +473,21 @@ class ESPTimeCastClient:
             async with self._session.get(url, timeout=self._timeout) as resp:
                 if resp.status >= 400:
                     raise ESPTimeCastError(f"HTTP {resp.status} for GET {path}")
-                text = await resp.text()
+                raw = await resp.read()
         except TimeoutError as err:
             raise ESPTimeCastTimeoutError(f"Timeout for GET {path}") from err
         except aiohttp.ClientError as err:
             raise ESPTimeCastConnectionError(
                 f"Connection error for GET {path}: {err}"
             ) from err
-        # The firmware embeds raw control characters (e.g. a form-feed icon
-        # glyph) inside JSON strings. That is invalid per the JSON spec and is
-        # rejected by strict parsers such as orjson (which Home Assistant uses
-        # for resp.json()). Parse leniently with strict=False so polling does
-        # not crash.
+        # The firmware embeds its own icon/symbol glyphs as raw bytes inside the
+        # JSON: both control characters (e.g. form-feed) and non-UTF-8 high bytes
+        # (e.g. 0xa8). Decoding the body as text would raise UnicodeDecodeError,
+        # and strict JSON parsers (orjson, which HA uses for resp.json()) reject
+        # control characters. So decode the raw bytes leniently and parse with
+        # strict=False. Bad bytes become U+FFFD, which the display-string
+        # cleaning then strips.
+        text = raw.decode("utf-8", errors="replace")
         try:
             data: dict[str, Any] = json.loads(text, strict=False)
         except json.JSONDecodeError as err:
