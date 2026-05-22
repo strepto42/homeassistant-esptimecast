@@ -26,6 +26,28 @@ async def test_setup_and_unload(
     assert mock_config_entry.state is ConfigEntryState.NOT_LOADED
 
 
+async def test_config_fetch_failure_is_non_fatal(
+    hass: HomeAssistant, mock_client, mock_config_entry: MockConfigEntry
+) -> None:
+    # /config.json returns transient 500s; a failure there must not break
+    # polling once we have a previous good config (/status still succeeds).
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = mock_config_entry.runtime_data
+
+    with patch(
+        "custom_components.esptimecast.api.ESPTimeCastClient.get_config",
+        new=AsyncMock(side_effect=ESPTimeCastConnectionError("500")),
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data is not None
+    # The previous good config is retained.
+    assert coordinator.data.config.hostname == "esptimecast"
+
+
 async def test_setup_retry_on_connection_error(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:

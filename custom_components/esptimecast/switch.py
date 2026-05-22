@@ -1,10 +1,13 @@
 """Switch platform for ESPTimeCast.
 
-The firmware keeps two separate states: live runtime (changed by ``/set_*``,
-reported by ``/status``) and the on-disk ``/config.json`` (only written by
-``/save``). Switches therefore read their state from ``/status`` so toggles
-"stick". Three toggles (day-of-week, colon blink, weather description) are not
-reported by ``/status`` at all, so those are optimistic (assumed) switches.
+The firmware keeps two states: live runtime (changed by ``/set_*``, reported by
+``/status``) and the on-disk ``/config.json`` (only written by ``/save``).
+
+- Switches whose state ``/status`` reports read it live, with an optimistic
+  override so the UI doesn't flip-flop while the confirming poll lands.
+- Three toggles ``/status`` never reports (show day-of-week, animated seconds,
+  show weather description) keep their state internally, seeded from the
+  on-disk config at startup.
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import DeviceData, ESPTimeCastClient, FullConfig
@@ -32,11 +35,8 @@ class ESPTimeCastSwitchDescription(SwitchEntityDescription):
 
 
 @dataclass(frozen=True, kw_only=True)
-class ESPTimeCastOptimisticSwitchDescription(SwitchEntityDescription):
-    """A toggle /status does not report, so its state is assumed.
-
-    Seeded from the on-disk config at startup, then tracked optimistically.
-    """
+class ESPTimeCastStoredSwitchDescription(SwitchEntityDescription):
+    """A toggle /status does not report; state is held locally."""
 
     seed_fn: Callable[[FullConfig], bool]
     set_fn: Callable[[ESPTimeCastClient, bool], Awaitable[Any]]
@@ -44,13 +44,6 @@ class ESPTimeCastOptimisticSwitchDescription(SwitchEntityDescription):
 
 # Switches whose state is reported live by /status.
 SWITCHES: tuple[ESPTimeCastSwitchDescription, ...] = (
-    ESPTimeCastSwitchDescription(
-        key="display",
-        translation_key="display",
-        # display_off is a firmware toggle; idempotent turn_on/off keeps it correct.
-        value_fn=lambda d: not d.status.display_off,
-        set_fn=lambda c, _on: c.set_display_off(True),
-    ),
     ESPTimeCastSwitchDescription(
         key="flip",
         translation_key="flip",
@@ -104,29 +97,28 @@ SWITCHES: tuple[ESPTimeCastSwitchDescription, ...] = (
         key="hide_donation",
         translation_key="hide_donation",
         entity_category=EntityCategory.CONFIG,
-        entity_registry_enabled_default=False,
         value_fn=lambda d: bool(d.status.raw.get("hideDonationMsg", False)),
         set_fn=lambda c, on: c.set_hide_donation(on),
     ),
 )
 
-# Toggles /status does not report; tracked optimistically.
-OPTIMISTIC_SWITCHES: tuple[ESPTimeCastOptimisticSwitchDescription, ...] = (
-    ESPTimeCastOptimisticSwitchDescription(
+# Toggles /status does not report; state held locally.
+STORED_SWITCHES: tuple[ESPTimeCastStoredSwitchDescription, ...] = (
+    ESPTimeCastStoredSwitchDescription(
         key="show_day_of_week",
         translation_key="show_day_of_week",
         entity_category=EntityCategory.CONFIG,
         seed_fn=lambda cfg: cfg.show_day_of_week,
         set_fn=lambda c, on: c.set_day_of_week(on),
     ),
-    ESPTimeCastOptimisticSwitchDescription(
-        key="colon_blink",
-        translation_key="colon_blink",
+    ESPTimeCastStoredSwitchDescription(
+        key="animated_seconds",
+        translation_key="animated_seconds",
         entity_category=EntityCategory.CONFIG,
         seed_fn=lambda cfg: cfg.colon_blink,
         set_fn=lambda c, on: c.set_colon_blink(on),
     ),
-    ESPTimeCastOptimisticSwitchDescription(
+    ESPTimeCastStoredSwitchDescription(
         key="show_weather_description",
         translation_key="show_weather_description",
         entity_category=EntityCategory.CONFIG,
@@ -147,14 +139,14 @@ async def async_setup_entry(
         ESPTimeCastSwitch(coordinator, description) for description in SWITCHES
     ]
     entities.extend(
-        ESPTimeCastOptimisticSwitch(coordinator, description)
-        for description in OPTIMISTIC_SWITCHES
+        ESPTimeCastStoredSwitch(coordinator, description)
+        for description in STORED_SWITCHES
     )
     async_add_entities(entities)
 
 
 class ESPTimeCastSwitch(ESPTimeCastEntity, SwitchEntity):
-    """A switch whose state is read live from /status."""
+    """A switch whose state is read live from /status (optimistic on change)."""
 
     entity_description: ESPTimeCastSwitchDescription
 
@@ -165,36 +157,44 @@ class ESPTimeCastSwitch(ESPTimeCastEntity, SwitchEntity):
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description
+        self._optimistic: bool | None = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._optimistic = None
+        super()._handle_coordinator_update()
 
     @property
     def is_on(self) -> bool:
+        if self._optimistic is not None:
+            return self._optimistic
         return self.entity_description.value_fn(self.coordinator.data)
 
+    async def _async_set(self, on: bool) -> None:
+        await self.entity_description.set_fn(self.coordinator.client, on)
+        self._optimistic = on
+        self.async_write_ha_state()
+        await self.coordinator.async_request_refresh()
+
     async def async_turn_on(self, **kwargs: Any) -> None:
-        if not self.is_on:
-            await self.entity_description.set_fn(self.coordinator.client, True)
-            await self.coordinator.async_request_refresh()
+        await self._async_set(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        if self.is_on:
-            await self.entity_description.set_fn(self.coordinator.client, False)
-            await self.coordinator.async_request_refresh()
+        await self._async_set(False)
 
 
-class ESPTimeCastOptimisticSwitch(ESPTimeCastEntity, SwitchEntity):
-    """A toggle /status does not report; state is assumed after each command."""
+class ESPTimeCastStoredSwitch(ESPTimeCastEntity, SwitchEntity):
+    """A toggle /status does not report; state held locally after each command."""
 
-    _attr_assumed_state = True
-    entity_description: ESPTimeCastOptimisticSwitchDescription
+    entity_description: ESPTimeCastStoredSwitchDescription
 
     def __init__(
         self,
         coordinator: ESPTimeCastCoordinator,
-        description: ESPTimeCastOptimisticSwitchDescription,
+        description: ESPTimeCastStoredSwitchDescription,
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description
-        # Seed from the last-saved on-disk config.
         self._is_on = description.seed_fn(coordinator.data.config)
 
     @property

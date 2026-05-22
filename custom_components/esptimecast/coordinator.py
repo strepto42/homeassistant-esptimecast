@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import DeviceData, ESPTimeCastClient, ESPTimeCastError
+from .api import DeviceData, ESPTimeCastClient, ESPTimeCastError, FullConfig
 from .const import CONF_HOST, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,7 +40,23 @@ class ESPTimeCastCoordinator(DataUpdateCoordinator[DeviceData]):
         )
 
     async def _async_update_data(self) -> DeviceData:
+        # /status is the live source of truth and is required.
         try:
-            return await self.client.get_device_data()
+            status = await self.client.get_status()
         except ESPTimeCastError as err:
             raise UpdateFailed(f"Error communicating with device: {err}") from err
+
+        # /config.json only seeds the settings switches at startup and feeds the
+        # Configure dialog. The device returns transient 500s for it (e.g. while
+        # busy), so a failure here must never take the integration down: reuse
+        # the last good config, or fall back to defaults on the very first poll.
+        try:
+            config = await self.client.get_config()
+        except ESPTimeCastError as err:
+            if self.data is not None:
+                config = self.data.config
+            else:
+                _LOGGER.debug("Initial /config.json fetch failed: %s", err)
+                config = FullConfig.from_dict({})
+
+        return DeviceData(status=status, config=config)

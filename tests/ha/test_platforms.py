@@ -82,8 +82,11 @@ async def test_new_switches_present_and_state_from_config(
     hass: HomeAssistant, mock_client, mock_config_entry
 ) -> None:
     await _setup(hass, mock_config_entry)
-    # colon_blink is True in the config fixture; show_day_of_week is False.
-    assert hass.states.get("switch.esptimecast_local_blinking_colon").state == STATE_ON
+    # colonBlinkEnabled (Animated seconds) is True in the config fixture;
+    # show_day_of_week is False.
+    assert (
+        hass.states.get("switch.esptimecast_local_animated_seconds").state == STATE_ON
+    )
     assert (
         hass.states.get("switch.esptimecast_local_show_day_of_week").state == STATE_OFF
     )
@@ -145,62 +148,54 @@ async def test_save_settings_button(
     mock_action.assert_awaited_once_with("save")
 
 
-async def test_brightness_number_set(
+async def test_display_light_state_and_brightness(
     hass: HomeAssistant, mock_client, mock_config_entry
 ) -> None:
     await _setup(hass, mock_config_entry)
-    number = hass.states.get("number.esptimecast_local_brightness")
-    assert number.state == "3.0"
+    light = hass.states.get("light.esptimecast_local_display")
+    assert light is not None
+    # status fixture: displayOff False, brightness 3 -> on, ~3/15*255.
+    assert light.state == STATE_ON
+    assert light.attributes["brightness"] == round(3 / 15 * 255)
 
+
+async def test_display_light_turn_off_sets_minus_one(
+    hass: HomeAssistant, mock_client, mock_config_entry
+) -> None:
+    await _setup(hass, mock_config_entry)
     with patch(
         "custom_components.esptimecast.api.ESPTimeCastClient.set_brightness",
         new=AsyncMock(),
     ) as mock_set:
         await hass.services.async_call(
-            Platform.NUMBER,
-            "set_value",
+            Platform.LIGHT,
+            "turn_off",
+            {ATTR_ENTITY_ID: "light.esptimecast_local_display"},
+            blocking=True,
+        )
+    # Off is the firmware's brightness == -1.
+    mock_set.assert_awaited_once_with(-1)
+
+
+async def test_display_light_set_brightness(
+    hass: HomeAssistant, mock_client, mock_config_entry
+) -> None:
+    await _setup(hass, mock_config_entry)
+    with patch(
+        "custom_components.esptimecast.api.ESPTimeCastClient.set_brightness",
+        new=AsyncMock(),
+    ) as mock_set:
+        await hass.services.async_call(
+            Platform.LIGHT,
+            "turn_on",
             {
-                ATTR_ENTITY_ID: "number.esptimecast_local_brightness",
-                "value": 10,
+                ATTR_ENTITY_ID: "light.esptimecast_local_display",
+                "brightness": 255,
             },
             blocking=True,
         )
-    mock_set.assert_awaited_once_with(10)
-
-
-async def test_switch_turn_off_display(
-    hass: HomeAssistant, mock_client, mock_config_entry
-) -> None:
-    await _setup(hass, mock_config_entry)
-    # Display is on (display_off is False) -> turning off should toggle once.
-    with patch(
-        "custom_components.esptimecast.api.ESPTimeCastClient.set_display_off",
-        new=AsyncMock(),
-    ) as mock_toggle:
-        await hass.services.async_call(
-            Platform.SWITCH,
-            "turn_off",
-            {ATTR_ENTITY_ID: "switch.esptimecast_local_display"},
-            blocking=True,
-        )
-    mock_toggle.assert_awaited_once()
-
-
-async def test_switch_turn_on_when_already_on_is_noop(
-    hass: HomeAssistant, mock_client, mock_config_entry
-) -> None:
-    await _setup(hass, mock_config_entry)
-    with patch(
-        "custom_components.esptimecast.api.ESPTimeCastClient.set_display_off",
-        new=AsyncMock(),
-    ) as mock_toggle:
-        await hass.services.async_call(
-            Platform.SWITCH,
-            "turn_on",
-            {ATTR_ENTITY_ID: "switch.esptimecast_local_display"},
-            blocking=True,
-        )
-    mock_toggle.assert_not_awaited()
+    # 255 (HA) maps to the device max of 15.
+    mock_set.assert_awaited_once_with(15)
 
 
 async def test_flip_switch_sets_value(
@@ -273,4 +268,5 @@ async def test_entities_have_unique_ids(
     assert any(e.startswith("switch.esptimecast_local") for e in entity_ids)
     assert any(e.startswith("button.esptimecast_local") for e in entity_ids)
     assert any(e.startswith("select.esptimecast_local") for e in entity_ids)
-    assert any(e.startswith("number.esptimecast_local") for e in entity_ids)
+    assert any(e.startswith("light.esptimecast_local") for e in entity_ids)
+    assert any(e.startswith("text.esptimecast_local") for e in entity_ids)

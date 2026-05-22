@@ -38,21 +38,20 @@
       "glucose_outdated": { "name": "Glucose outdated" }
     },
     "switch": {
-      "display": { "name": "Display" },
       "flip": { "name": "Flip display" },
       "twelve_hour": { "name": "12-hour clock" },
       "show_day_of_week": { "name": "Show day of week" },
       "show_date": { "name": "Show date" },
       "show_humidity": { "name": "Show humidity" },
-      "colon_blink": { "name": "Blinking colon" },
+      "animated_seconds": { "name": "Animated seconds" },
       "show_weather_description": { "name": "Show weather description" },
       "countdown": { "name": "Countdown" },
       "dramatic_countdown": { "name": "Dramatic countdown" },
       "clock_only_dimming": { "name": "Clock only during dimming" },
       "hide_donation": { "name": "Hide donation message" }
     },
-    "number": {
-      "brightness": { "name": "Brightness" }
+    "light": {
+      "display": { "name": "Display" }
     },
     "select": {
       "language": { "name": "Language" },

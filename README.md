@@ -16,6 +16,8 @@ controls as native Home Assistant entities, plus services for messages and timer
   (full settings), default every 30 s.
 - **Zeroconf discovery** — devices on your network are offered automatically.
 - Entities:
+  - **Light:** the display — on/off plus a brightness slider (0–15 on the
+    device), mirroring the web UI's single Brightness control.
   - **Text:** custom message — type to scroll a message on the display, clear
     to remove it (mirrors the web UI's Custom Message box).
   - **Sensors:** temperature, humidity, weather description, sunrise, sunset,
@@ -23,10 +25,9 @@ controls as native Home Assistant entities, plus services for messages and timer
     Nightscout is active).
   - **Binary sensors:** time synced, dimming active (and glucose outdated when
     Nightscout is active) — all diagnostic.
-  - **Switches:** display, flip, 12-hour, show day-of-week, show date,
-    show humidity, blinking colon, show weather description, countdown,
-    dramatic countdown, clock-only-during-dimming, hide donation message.
-  - **Number:** brightness.
+  - **Switches:** flip, 12-hour, show day-of-week, show date, show humidity,
+    animated seconds, show weather description, countdown, dramatic countdown,
+    clock-only-during-dimming, hide donation message.
   - **Selects:** language, units (metric/imperial).
   - **Buttons:** restart, next/previous mode, clear message, save settings to
     device (persists live changes to flash, no reboot).
@@ -34,11 +35,11 @@ controls as native Home Assistant entities, plus services for messages and timer
 
 ### Live vs. saved state
 
-Most controls (brightness, switches, message) apply **instantly** to the
+Most controls (display/brightness, switches, message) apply **instantly** to the
 running display but are not written to flash, so they revert on a power cycle —
 press **Save settings to device** to persist them. A few toggles (day-of-week,
-blinking colon, weather description) cannot be read back from the device, so
-those switches are *optimistic* (Home Assistant assumes the value you set).
+animated seconds, weather description) cannot be read back from the device, so
+those switches hold the last value you set.
 
 Settings that can only be applied via the device's `/save` (which reboots it) —
 clock/weather durations, dimming schedule, countdown date/time, hostname, NTP
