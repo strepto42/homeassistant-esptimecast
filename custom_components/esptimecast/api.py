@@ -288,6 +288,38 @@ class Status:
             raw=data,
         )
 
+    @property
+    def dimming_active(self) -> bool:
+        """Whether the display is currently dimmed, mirroring the firmware.
+
+        Dimming is active when auto-dimming OR scheduled dimming is enabled and
+        the current local time falls within the relevant window. Auto-dimming
+        (sunset -> sunrise) applies even when scheduled dimming is off.
+        """
+        d = self.dimming
+        if not (d.auto_enabled or d.enabled):
+            return False
+        if self.local_time is None:
+            return False
+        try:
+            parts = [int(p) for p in self.local_time.split(":")]
+        except ValueError:
+            return False
+        now = parts[0] * 60 + parts[1]
+
+        if d.auto_enabled:
+            start, end = self.weather.sunset, self.weather.sunrise
+        else:
+            start, end = d.start, d.end
+        if start is None or end is None:
+            return False
+
+        start_total = start.hour * 60 + start.minute
+        end_total = end.hour * 60 + end.minute
+        if start_total < end_total:
+            return start_total <= now < end_total
+        return now >= start_total or now < end_total  # overnight window
+
 
 @dataclass(slots=True)
 class CountdownConfig:
@@ -595,6 +627,14 @@ class ESPTimeCastClient:
         await self._set("clock_only_dimming", value)
 
     # -- convenience actions ------------------------------------------------
+
+    async def persist(self) -> None:
+        """Persist the current live runtime to flash (deferred, no reboot).
+
+        The firmware applies most /set_* changes to RAM only; this marks the
+        config dirty so it is saved, surviving a power cycle.
+        """
+        await self.send_action("save")
 
     async def restart(self) -> None:
         await self.send_action("restart")

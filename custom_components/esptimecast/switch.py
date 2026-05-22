@@ -73,20 +73,6 @@ SWITCHES: tuple[ESPTimeCastSwitchDescription, ...] = (
         set_fn=lambda c, on: c.set_humidity(on),
     ),
     ESPTimeCastSwitchDescription(
-        key="countdown",
-        translation_key="countdown",
-        entity_category=EntityCategory.CONFIG,
-        value_fn=lambda d: d.status.countdown.enabled,
-        set_fn=lambda c, on: c.set_countdown_enabled(on),
-    ),
-    ESPTimeCastSwitchDescription(
-        key="dramatic_countdown",
-        translation_key="dramatic_countdown",
-        entity_category=EntityCategory.CONFIG,
-        value_fn=lambda d: d.status.countdown.is_dramatic,
-        set_fn=lambda c, on: c.set_dramatic_countdown(on),
-    ),
-    ESPTimeCastSwitchDescription(
         key="clock_only_dimming",
         translation_key="clock_only_dimming",
         entity_category=EntityCategory.CONFIG,
@@ -177,6 +163,10 @@ class _OptimisticSwitch(ESPTimeCastEntity, SwitchEntity):
 
     async def _async_set(self, on: bool) -> None:
         await self._device_set(on)
+        # /set_* applies to RAM only; persist so the toggle survives a power
+        # cycle (and the saved config catches up, which is the only readback
+        # source for the toggles /status does not report).
+        await self.coordinator.client.persist()
         self._optimistic = on
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()

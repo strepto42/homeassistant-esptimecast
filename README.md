@@ -23,33 +23,30 @@ controls as native Home Assistant entities, plus services for messages and timer
   - **Sensors:** temperature, humidity, weather description, sunrise, sunset,
     countdown remaining; signal strength and uptime (diagnostic); glucose (when
     Nightscout is active).
-  - **Binary sensors:** time synced, dimming active (and glucose outdated when
-    Nightscout is active) — all diagnostic.
+  - **Binary sensors:** time synced, dimming active — reflects whether the
+    display is *currently* dimmed (auto sunset→sunrise or the scheduled window),
+    not just whether dimming is enabled — and glucose outdated (when Nightscout
+    is active). All diagnostic.
   - **Switches:** flip, 12-hour, show day-of-week, show date, show humidity,
-    animated seconds, show weather description, countdown, dramatic countdown,
-    clock-only-during-dimming, hide donation message.
-  - **Selects:** language, units (metric/imperial).
-  - **Buttons:** restart, next/previous mode, clear message, save settings to
-    device (persists live changes to flash, no reboot).
+    animated seconds, show weather description, clock-only-during-dimming, hide
+    donation message.
+  - **Buttons:** restart, next/previous mode, clear message.
 - **Services:** `send_message` (with advanced options), `clear_message`.
 
-### Live vs. saved state
-
-Most controls (display/brightness, switches, message) apply **instantly** to the
-running display but are not written to flash, so they revert on a power cycle —
-press **Save settings to device** to persist them. A few toggles (day-of-week,
-animated seconds, weather description) cannot be read back from the device, so
-those switches hold the last value you set.
+Switch changes apply instantly and are **persisted to the device automatically**
+(no reboot), so they survive a power cycle. A few toggles (day-of-week, animated
+seconds, weather description) can't be read back from the running device, so
+they reflect the last saved value.
 
 ### Configure dialog
 
-Settings that the device can only apply via `/save` (which reboots it, ~10–20s)
-are in the integration's **Configure** dialog (Settings → Devices & Services →
-ESPTimeCast → Configure): time zone, clock/weather durations, NTP servers,
+Persistent settings are in the integration's **Configure** dialog (Settings →
+Devices & Services → ESPTimeCast → Configure); saving them reboots the device
+(~10–20s): **language, units**, time zone, clock/weather durations, NTP servers,
 hostname, OpenWeather API key & location, the dimming schedule, and the
-countdown date/time/label. Wi-Fi credentials are intentionally not configurable
-here — changing them would move the device off your network. Use the device's
-own web UI for Wi-Fi.
+**countdown** (enabled, date, time, label, dramatic). Wi-Fi credentials are
+intentionally not configurable here — changing them would move the device off
+your network; use the device's own web UI for Wi-Fi.
 
 ## Installation (HACS)
 

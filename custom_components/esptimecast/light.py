@@ -48,6 +48,7 @@ class ESPTimeCastDisplayLight(ESPTimeCastEntity, LightEntity):
     """The matrix display as a dimmable light."""
 
     _attr_translation_key = "display"
+    _attr_icon = "mdi:led-strip"
     _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}  # noqa: RUF012
 

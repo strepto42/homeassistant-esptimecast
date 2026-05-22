@@ -21,11 +21,14 @@ from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 from homeassistant.helpers import selector
 
 from .api import ESPTimeCastError, FullConfig
+from .const import LANGUAGES, UNITS
 
 _LOGGER = logging.getLogger(__name__)
 
 # Form field keys (user-facing) -> mapped to firmware names on submit.
 CONF_TIME_ZONE = "time_zone"
+CONF_LANGUAGE = "language"
+CONF_UNITS = "units"
 CONF_CLOCK_DURATION = "clock_duration"
 CONF_WEATHER_DURATION = "weather_duration"
 CONF_NTP1 = "ntp_server1"
@@ -80,6 +83,22 @@ def build_schema(config: FullConfig) -> vol.Schema:
             vol.Required(
                 CONF_TIME_ZONE, default=config.time_zone or "UTC"
             ): selector.TextSelector(),
+            vol.Required(
+                CONF_LANGUAGE, default=config.language or "en"
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(LANGUAGES),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required(
+                CONF_UNITS, default=config.weather_units or "metric"
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(UNITS),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
             vol.Required(
                 CONF_CLOCK_DURATION,
                 default=round((config.clock_duration or 10000) / 1000),
@@ -171,6 +190,8 @@ def build_payload(user_input: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "timeZone": user_input[CONF_TIME_ZONE],
+        "language": user_input[CONF_LANGUAGE],
+        "weatherUnits": user_input[CONF_UNITS],
         "clockDuration": int(user_input[CONF_CLOCK_DURATION]) * 1000,
         "weatherDuration": int(user_input[CONF_WEATHER_DURATION]) * 1000,
         "ntpServer1": user_input.get(CONF_NTP1, ""),

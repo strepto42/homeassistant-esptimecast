@@ -38,6 +38,8 @@ async def test_options_flow_saves_mapped_payload(
             result["flow_id"],
             {
                 "time_zone": "Australia/Brisbane",
+                "language": "ja",
+                "units": "imperial",
                 "clock_duration": 12,
                 "weather_duration": 6,
                 "ntp_server1": "pool.ntp.org",
@@ -76,6 +78,9 @@ async def test_options_flow_saves_mapped_payload(
     assert payload["countdownTime"] == "09:00"
     assert payload["countdownLabel"] == "XMAS"
     assert payload["hostname"] == "lobby"
+    # language and units are now part of the settings dialog
+    assert payload["language"] == "ja"
+    assert payload["weatherUnits"] == "imperial"
     # blank API key is omitted so the stored key is left unchanged
     assert payload["openWeatherApiKey"] is None
 
@@ -96,6 +101,8 @@ async def test_options_flow_save_failure_shows_error(
             result["flow_id"],
             {
                 "time_zone": "UTC",
+                "language": "en",
+                "units": "metric",
                 "clock_duration": 10,
                 "weather_duration": 5,
                 "dim_start": "18:00:00",
