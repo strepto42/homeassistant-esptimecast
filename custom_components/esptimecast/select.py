@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import DeviceData, ESPTimeCastClient
-from .const import DISPLAY_MODES, LANGUAGES, UNITS
+from .const import LANGUAGES, UNITS
 from .coordinator import ESPTimeCastConfigEntry, ESPTimeCastCoordinator
 from .entity import ESPTimeCastEntity
 
@@ -26,13 +26,6 @@ class ESPTimeCastSelectDescription(SelectEntityDescription):
 
 
 SELECTS: tuple[ESPTimeCastSelectDescription, ...] = (
-    ESPTimeCastSelectDescription(
-        key="display_mode",
-        translation_key="display_mode",
-        options=list(DISPLAY_MODES),
-        current_fn=lambda d: d.status.mode if d.status.mode in DISPLAY_MODES else None,
-        select_fn=lambda c, option: c.go_to_mode(option),
-    ),
     ESPTimeCastSelectDescription(
         key="language",
         translation_key="language",
