@@ -123,6 +123,31 @@ async def test_get_status_keeps_raw(client, status_payload):
     assert status.raw["nextDonationTime"] == "N/A"
 
 
+async def test_get_status_tolerates_raw_control_chars(client):
+    # The firmware embeds a raw form-feed byte (0x0c) as an icon glyph inside
+    # JSON strings. That is invalid per the JSON spec and rejected by strict
+    # parsers (e.g. orjson, or stdlib json with the default strict=True). The
+    # client must parse leniently so polling does not crash.
+    # Use 0x10 here (not 0x0c) because the icon byte varies per weather icon;
+    # the client must strip any control character, not just form-feed.
+    raw_body = (
+        '{"id":"esptimecast","mode":"weather_desc","brightness":3,'
+        '"weather":{"weatherDescription":"\x10 LIGHT RAIN","icon":"\x10",'
+        '"currentTemperature":23}}'
+    )
+    with aioresponses() as m:
+        m.get(
+            "http://esptimecast.local/status",
+            body=raw_body,
+            content_type="application/json",
+        )
+        status = await client.get_status()
+    assert status.mode == "weather_desc"
+    assert status.weather.temperature == 23
+    assert status.weather.description == "LIGHT RAIN"
+    assert status.weather.icon is None  # control-only glyph reduces to nothing
+
+
 # --- get_version ------------------------------------------------------------
 
 
