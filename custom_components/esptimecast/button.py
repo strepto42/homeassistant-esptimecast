@@ -25,6 +25,8 @@ class ESPTimeCastButtonDescription(ButtonEntityDescription):
     """Describes an ESPTimeCast button."""
 
     press_fn: Callable[[ESPTimeCastClient], Awaitable[Any]]
+    # Refresh the coordinator after the press so HA state updates immediately.
+    refresh: bool = False
 
 
 BUTTONS: tuple[ESPTimeCastButtonDescription, ...] = (
@@ -38,37 +40,27 @@ BUTTONS: tuple[ESPTimeCastButtonDescription, ...] = (
         key="next_mode",
         translation_key="next_mode",
         press_fn=lambda c: c.next_mode(),
+        refresh=True,
     ),
     ESPTimeCastButtonDescription(
         key="previous_mode",
         translation_key="previous_mode",
         press_fn=lambda c: c.previous_mode(),
-    ),
-    ESPTimeCastButtonDescription(
-        key="save_config",
-        translation_key="save_config",
-        entity_category=EntityCategory.CONFIG,
-        press_fn=lambda c: c.send_action("save"),
-    ),
-    ESPTimeCastButtonDescription(
-        key="stop_timer",
-        translation_key="stop_timer",
-        press_fn=lambda c: c.stop_timer(),
-    ),
-    ESPTimeCastButtonDescription(
-        key="stop_stopwatch",
-        translation_key="stop_stopwatch",
-        press_fn=lambda c: c.stop_stopwatch(),
-    ),
-    ESPTimeCastButtonDescription(
-        key="restart_pomodoro",
-        translation_key="restart_pomodoro",
-        press_fn=lambda c: c.restart_pomodoro(),
+        refresh=True,
     ),
     ESPTimeCastButtonDescription(
         key="clear_message",
         translation_key="clear_message",
         press_fn=lambda c: c.clear_message(),
+        refresh=True,
+    ),
+    ESPTimeCastButtonDescription(
+        key="save_settings",
+        translation_key="save_settings",
+        entity_category=EntityCategory.CONFIG,
+        # Persists the current live runtime (brightness, toggles, ...) to the
+        # device's flash so it survives a reboot. No reboot, no /save form.
+        press_fn=lambda c: c.send_action("save"),
     ),
 )
 
@@ -100,3 +92,5 @@ class ESPTimeCastButton(ESPTimeCastEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         await self.entity_description.press_fn(self.coordinator.client)
+        if self.entity_description.refresh:
+            await self.coordinator.async_request_refresh()

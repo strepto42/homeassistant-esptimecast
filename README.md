@@ -18,25 +18,32 @@ controls as native Home Assistant entities, plus services for messages and timer
 - Entities:
   - **Text:** custom message — type to scroll a message on the display, clear
     to remove it (mirrors the web UI's Custom Message box).
-  - **Sensors:** temperature, humidity, weather description, signal strength
-    (diagnostic), uptime (diagnostic); countdown remaining (when a countdown is
-    set) and glucose (when Nightscout is active).
-  - **Binary sensors:** time synced, display busy, dimming active (and glucose
-    outdated when Nightscout is active) — all diagnostic.
+  - **Sensors:** temperature, humidity, weather description, sunrise, sunset,
+    countdown remaining; signal strength and uptime (diagnostic); glucose (when
+    Nightscout is active).
+  - **Binary sensors:** time synced, dimming active (and glucose outdated when
+    Nightscout is active) — all diagnostic.
   - **Switches:** display, flip, 12-hour, show day-of-week, show date,
     show humidity, blinking colon, show weather description, countdown,
     dramatic countdown, clock-only-during-dimming, hide donation message.
   - **Number:** brightness.
-  - **Selects:** display mode, language, units (metric/imperial).
-  - **Buttons:** restart, next/previous mode, save config, stop timer/stopwatch,
-    restart pomodoro, clear message.
-  - **Notify:** push a scrolling message (with advanced options) to the display.
-- **Services:** `send_message`, `start_timer`, `start_pomodoro`, `start_stopwatch`,
-  `go_to_mode`, `clear_message`.
+  - **Selects:** language, units (metric/imperial).
+  - **Buttons:** restart, next/previous mode, clear message, save settings to
+    device (persists live changes to flash, no reboot).
+- **Services:** `send_message` (with advanced options), `clear_message`.
 
-Settings that require a device reboot to apply (clock/weather durations, dimming
-schedule, countdown date/time, hostname, NTP servers, timezone) are handled
-separately and not yet exposed; use the device's web UI for those for now.
+### Live vs. saved state
+
+Most controls (brightness, switches, message) apply **instantly** to the
+running display but are not written to flash, so they revert on a power cycle —
+press **Save settings to device** to persist them. A few toggles (day-of-week,
+blinking colon, weather description) cannot be read back from the device, so
+those switches are *optimistic* (Home Assistant assumes the value you set).
+
+Settings that can only be applied via the device's `/save` (which reboots it) —
+clock/weather durations, dimming schedule, countdown date/time, hostname, NTP
+servers, timezone — will be exposed through a **Configure** dialog in a future
+release; use the device's web UI for those for now.
 
 ## Installation (HACS)
 

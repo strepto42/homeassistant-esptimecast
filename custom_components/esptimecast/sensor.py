@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import time
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -30,6 +31,10 @@ def _temp_unit(data: DeviceData) -> str:
     if data.config.weather_units == "imperial":
         return UnitOfTemperature.FAHRENHEIT
     return UnitOfTemperature.CELSIUS
+
+
+def _fmt_time(value: time | None) -> str | None:
+    return value.strftime("%H:%M") if value is not None else None
 
 
 def _runtime_seconds(data: DeviceData) -> int | None:
@@ -95,15 +100,27 @@ SENSORS: tuple[ESPTimeCastSensorDescription, ...] = (
         entity_registry_enabled_default=False,
         value_fn=_runtime_seconds,
     ),
-)
-
-# Created only when a countdown is configured.
-COUNTDOWN_SENSOR = ESPTimeCastSensorDescription(
-    key="countdown_remaining",
-    translation_key="countdown_remaining",
-    device_class=SensorDeviceClass.DURATION,
-    native_unit_of_measurement=UnitOfTime.SECONDS,
-    value_fn=lambda d: d.status.countdown.remaining,
+    ESPTimeCastSensorDescription(
+        key="sunrise",
+        translation_key="sunrise",
+        value_fn=lambda d: _fmt_time(d.status.weather.sunrise),
+    ),
+    ESPTimeCastSensorDescription(
+        key="sunset",
+        translation_key="sunset",
+        value_fn=lambda d: _fmt_time(d.status.weather.sunset),
+    ),
+    ESPTimeCastSensorDescription(
+        key="countdown_remaining",
+        translation_key="countdown_remaining",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        suggested_unit_of_measurement=UnitOfTime.MINUTES,
+        # remaining is 0 when no countdown is active; report None then.
+        value_fn=lambda d: (
+            d.status.countdown.remaining if d.status.countdown.enabled else None
+        ),
+    ),
 )
 
 # Created only when Nightscout is active.
@@ -123,10 +140,7 @@ async def async_setup_entry(
     """Set up ESPTimeCast sensors."""
     coordinator = entry.runtime_data
     descriptions = list(SENSORS)
-    data = coordinator.data
-    if data.config.countdown.enabled or data.status.countdown.enabled:
-        descriptions.append(COUNTDOWN_SENSOR)
-    if data.status.nightscout.active:
+    if coordinator.data.status.nightscout.active:
         descriptions.append(GLUCOSE_SENSOR)
     async_add_entities(
         ESPTimeCastSensor(coordinator, description) for description in descriptions

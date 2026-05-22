@@ -38,62 +38,6 @@ send_message:
       selector:
         boolean:
 
-start_timer:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          integration: esptimecast
-    duration:
-      required: true
-      example: "5M"
-      selector:
-        text:
-
-start_pomodoro:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          integration: esptimecast
-    spec:
-      required: true
-      example: "25-5-15"
-      selector:
-        text:
-
-start_stopwatch:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          integration: esptimecast
-
-go_to_mode:
-  fields:
-    device_id:
-      required: true
-      selector:
-        device:
-          integration: esptimecast
-    mode:
-      required: true
-      example: "clock"
-      selector:
-        select:
-          options:
-            - clock
-            - weather
-            - weather_desc
-            - countdown
-            - nightscout
-            - date
-            - message
-            - timer
-
 clear_message:
   fields:
     device_id:

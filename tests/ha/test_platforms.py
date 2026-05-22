@@ -93,6 +93,58 @@ async def test_new_switches_present_and_state_from_config(
     )
 
 
+async def test_restored_sensors_present(
+    hass: HomeAssistant, mock_client, mock_config_entry
+) -> None:
+    await _setup(hass, mock_config_entry)
+    # sunrise/sunset come back as HH:MM strings.
+    assert hass.states.get("sensor.esptimecast_local_sunrise").state == "06:24"
+    assert hass.states.get("sensor.esptimecast_local_sunset").state == "17:04"
+    # countdown remaining is always created now (no countdown -> unknown).
+    assert hass.states.get("sensor.esptimecast_local_countdown_remaining") is not None
+    # display_busy binary sensor was removed.
+    assert hass.states.get("binary_sensor.esptimecast_local_display_busy") is None
+
+
+async def test_optimistic_switch_toggle(
+    hass: HomeAssistant, mock_client, mock_config_entry
+) -> None:
+    await _setup(hass, mock_config_entry)
+    entity_id = "switch.esptimecast_local_show_day_of_week"
+    # show_day_of_week is False in the config fixture (the seed).
+    assert hass.states.get(entity_id).state == STATE_OFF
+    with patch(
+        "custom_components.esptimecast.api.ESPTimeCastClient.set_day_of_week",
+        new=AsyncMock(),
+    ) as mock_set:
+        await hass.services.async_call(
+            Platform.SWITCH,
+            "turn_on",
+            {ATTR_ENTITY_ID: entity_id},
+            blocking=True,
+        )
+    mock_set.assert_awaited_once_with(True)
+    # Optimistic: state flips immediately without a coordinator read-back.
+    assert hass.states.get(entity_id).state == STATE_ON
+
+
+async def test_save_settings_button(
+    hass: HomeAssistant, mock_client, mock_config_entry
+) -> None:
+    await _setup(hass, mock_config_entry)
+    with patch(
+        "custom_components.esptimecast.api.ESPTimeCastClient.send_action",
+        new=AsyncMock(),
+    ) as mock_action:
+        await hass.services.async_call(
+            Platform.BUTTON,
+            "press",
+            {ATTR_ENTITY_ID: "button.esptimecast_local_save_settings_to_device"},
+            blocking=True,
+        )
+    mock_action.assert_awaited_once_with("save")
+
+
 async def test_brightness_number_set(
     hass: HomeAssistant, mock_client, mock_config_entry
 ) -> None:

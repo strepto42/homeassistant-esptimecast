@@ -35,13 +35,6 @@ BINARY_SENSORS: tuple[ESPTimeCastBinarySensorDescription, ...] = (
         value_fn=lambda d: d.status.time_synced,
     ),
     ESPTimeCastBinarySensorDescription(
-        key="display_busy",
-        translation_key="display_busy",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda d: d.status.display_busy,
-    ),
-    ESPTimeCastBinarySensorDescription(
         key="dimming_active",
         translation_key="dimming_active",
         entity_category=EntityCategory.DIAGNOSTIC,

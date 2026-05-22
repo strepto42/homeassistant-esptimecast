@@ -50,35 +50,18 @@ async def test_send_message_service(
     )
 
 
-async def test_start_timer_service(
+async def test_clear_message_service(
     hass: HomeAssistant, mock_client, mock_config_entry
 ) -> None:
     device_id = await _setup_and_get_device_id(hass, mock_config_entry)
     with patch(
-        "custom_components.esptimecast.api.ESPTimeCastClient.start_timer",
+        "custom_components.esptimecast.api.ESPTimeCastClient.clear_message",
         new=AsyncMock(),
-    ) as mock_timer:
+    ) as mock_clear:
         await hass.services.async_call(
             DOMAIN,
-            "start_timer",
-            {"device_id": device_id, "duration": "5M"},
+            "clear_message",
+            {"device_id": device_id},
             blocking=True,
         )
-    mock_timer.assert_awaited_once_with("5M")
-
-
-async def test_go_to_mode_service(
-    hass: HomeAssistant, mock_client, mock_config_entry
-) -> None:
-    device_id = await _setup_and_get_device_id(hass, mock_config_entry)
-    with patch(
-        "custom_components.esptimecast.api.ESPTimeCastClient.go_to_mode",
-        new=AsyncMock(),
-    ) as mock_mode:
-        await hass.services.async_call(
-            DOMAIN,
-            "go_to_mode",
-            {"device_id": device_id, "mode": "clock"},
-            blocking=True,
-        )
-    mock_mode.assert_awaited_once_with("clock")
+    mock_clear.assert_awaited_once()
