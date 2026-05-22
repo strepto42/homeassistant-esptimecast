@@ -1,0 +1,498 @@
+"""Self-contained async HTTP client for ESPTimeCast devices.
+
+This module deliberately has **no Home Assistant imports and no relative
+imports** so it can be unit-tested standalone on any OS (it is loaded by file
+path in the test suite). The Home Assistant layer wraps this client.
+
+Device API reference (firmware 1.6.0, port 80, no auth):
+  GET  /status              -> full JSON state (polling source of truth)
+  GET  /get_version         -> {"version", "board"}
+  POST /action              -> generic command bus (409 when busy)
+  POST /set_custom_message  -> scrolling message
+  POST /set_<setting>       -> typed single-setting endpoints
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import time
+from typing import Any
+
+import aiohttp
+
+DEFAULT_PORT = 80
+DEFAULT_TIMEOUT = 10.0
+
+# Form-feed glyph the firmware prepends to the weather description as an icon.
+_ICON_PREFIX = "\f"
+
+# Masked secret marker used by the firmware in /status.config.
+_MASKED = "***HIDDEN***"
+
+
+# --- Exceptions -------------------------------------------------------------
+
+
+class ESPTimeCastError(Exception):
+    """Base error for all client failures."""
+
+
+class ESPTimeCastConnectionError(ESPTimeCastError):
+    """Raised when the device cannot be reached."""
+
+
+class ESPTimeCastTimeoutError(ESPTimeCastError):
+    """Raised when a request times out."""
+
+
+class ESPTimeCastBusyError(ESPTimeCastError):
+    """Raised when the device returns HTTP 409 (protected message on screen)."""
+
+
+# --- Data models ------------------------------------------------------------
+
+
+def _to_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _hm_to_time(hour: Any, minute: Any) -> time | None:
+    h = _to_int(hour)
+    m = _to_int(minute)
+    if h is None or m is None:
+        return None
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        return None
+    return time(h, m)
+
+
+@dataclass(slots=True)
+class Weather:
+    """Weather sub-object from /status."""
+
+    temperature: float | None
+    description: str | None
+    icon: str | None
+    humidity: int | None
+    sunrise: time | None
+    sunset: time | None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Weather:
+        desc = data.get("weatherDescription")
+        if isinstance(desc, str):
+            desc = desc.replace(_ICON_PREFIX, "").strip() or None
+        return cls(
+            temperature=_to_float(data.get("currentTemperature")),
+            description=desc,
+            icon=data.get("icon") or None,
+            humidity=_to_int(data.get("currentHumidity")),
+            sunrise=_hm_to_time(data.get("sunriseHour"), data.get("sunriseMinute")),
+            sunset=_hm_to_time(data.get("sunsetHour"), data.get("sunsetMinute")),
+        )
+
+
+@dataclass(slots=True)
+class Countdown:
+    """Countdown sub-object from /status."""
+
+    enabled: bool
+    target_timestamp: int | None
+    label: str
+    is_dramatic: bool
+    remaining: int | None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Countdown:
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            target_timestamp=_to_int(data.get("targetTimestamp")),
+            label=data.get("label", "") or "",
+            is_dramatic=bool(data.get("isDramatic", False)),
+            remaining=_to_int(data.get("remaining")),
+        )
+
+
+@dataclass(slots=True)
+class Nightscout:
+    """Nightscout glucose sub-object from /status."""
+
+    active: bool
+    glucose: float | None
+    trend: str | None
+    last_reading_epoch: int | None
+    minutes_since_reading: int | None
+    is_outdated: bool
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Nightscout:
+        return cls(
+            active=bool(data.get("active", False)),
+            glucose=_to_float(data.get("glucose")),
+            trend=data.get("trend"),
+            last_reading_epoch=_to_int(data.get("lastReadingEpoch")),
+            minutes_since_reading=_to_int(data.get("minutesSinceReading")),
+            is_outdated=bool(data.get("isOutdated", True)),
+        )
+
+
+@dataclass(slots=True)
+class Dimming:
+    """Auto-dimming sub-object from /status."""
+
+    enabled: bool
+    auto_enabled: bool
+    clock_only: bool
+    start: time | None
+    end: time | None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Dimming:
+        return cls(
+            enabled=bool(data.get("dimmingEnabled", False)),
+            auto_enabled=bool(data.get("autoDimmingEnabled", False)),
+            clock_only=bool(data.get("clockOnlyDuringDimming", False)),
+            start=_hm_to_time(data.get("dimStartHour"), data.get("dimStartMinute")),
+            end=_hm_to_time(data.get("dimEndHour"), data.get("dimEndMinute")),
+        )
+
+
+@dataclass(slots=True)
+class DeviceConfig:
+    """The saved-config sub-object from /status (secrets masked)."""
+
+    ssid: str | None
+    has_api_key: bool
+    openweather_city: str | None
+    weather_units: str | None
+    clock_duration: int | None
+    weather_duration: int | None
+    time_zone: str | None
+    language: str | None
+    flip_display: bool
+    twelve_hour: bool
+    show_date: bool
+    show_humidity: bool
+    ntp_server1: str | None
+    ntp_server2: str | None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> DeviceConfig:
+        api_key = data.get("openWeatherApiKey") or ""
+        return cls(
+            ssid=data.get("ssid") or None,
+            has_api_key=bool(api_key),
+            openweather_city=data.get("openWeatherCity") or None,
+            weather_units=data.get("weatherUnits") or None,
+            clock_duration=_to_int(data.get("clockDuration")),
+            weather_duration=_to_int(data.get("weatherDuration")),
+            time_zone=data.get("timeZone") or None,
+            language=data.get("language") or None,
+            flip_display=bool(data.get("flipDisplay", False)),
+            twelve_hour=bool(data.get("twelveHourToggle", False)),
+            show_date=bool(data.get("showDate", False)),
+            show_humidity=bool(data.get("showHumidity", False)),
+            ntp_server1=data.get("ntpServer1") or None,
+            ntp_server2=data.get("ntpServer2") or None,
+        )
+
+
+@dataclass(slots=True)
+class Status:
+    """Parsed /status response."""
+
+    id: str | None
+    version: str | None
+    hardware: str | None
+    board: str | None
+    display_mode: int | None
+    mode: str | None
+    message: str
+    display_busy: bool
+    allow_interrupt: bool
+    display_off: bool
+    brightness: int | None
+    device_runtime: str | None
+    session_runtime: int | None
+    wifi_signal: int | None
+    mdns_url: str | None
+    time_synced: bool
+    local_time: str | None
+    epoch_time: int | None
+    weather: Weather
+    countdown: Countdown
+    nightscout: Nightscout
+    dimming: Dimming
+    config: DeviceConfig
+    raw: dict[str, Any] = field(repr=False)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Status:
+        return cls(
+            id=data.get("id"),
+            version=data.get("version"),
+            hardware=data.get("hardware"),
+            board=data.get("board"),
+            display_mode=_to_int(data.get("displayMode")),
+            mode=data.get("mode"),
+            message=data.get("message", "") or "",
+            display_busy=bool(data.get("displayBusy", False)),
+            allow_interrupt=bool(data.get("allowInterrupt", False)),
+            display_off=bool(data.get("displayOff", False)),
+            brightness=_to_int(data.get("brightness")),
+            device_runtime=data.get("device_runtime"),
+            session_runtime=_to_int(data.get("session_runtime")),
+            wifi_signal=_to_int(data.get("wifi_signal")),
+            mdns_url=data.get("mdns_url"),
+            time_synced=bool(data.get("time_synced", False)),
+            local_time=data.get("localTime"),
+            epoch_time=_to_int(data.get("epochTime")),
+            weather=Weather.from_dict(data.get("weather", {}) or {}),
+            countdown=Countdown.from_dict(data.get("countdown", {}) or {}),
+            nightscout=Nightscout.from_dict(data.get("nightscout", {}) or {}),
+            dimming=Dimming.from_dict(data.get("dimming", {}) or {}),
+            config=DeviceConfig.from_dict(data.get("config", {}) or {}),
+            raw=data,
+        )
+
+
+# --- Client -----------------------------------------------------------------
+
+
+def _normalise_host(host: str) -> str:
+    """Strip scheme/trailing slash so we control URL construction."""
+    host = host.strip()
+    for prefix in ("http://", "https://"):
+        if host.lower().startswith(prefix):
+            host = host[len(prefix) :]
+            break
+    return host.strip("/")
+
+
+def _bool_to_int(value: Any) -> Any:
+    if isinstance(value, bool):
+        return 1 if value else 0
+    return value
+
+
+class ESPTimeCastClient:
+    """Async client for a single ESPTimeCast device."""
+
+    def __init__(
+        self,
+        host: str,
+        *,
+        session: aiohttp.ClientSession,
+        port: int = DEFAULT_PORT,
+        timeout: float = DEFAULT_TIMEOUT,
+    ) -> None:
+        self._host = _normalise_host(host)
+        self._port = port
+        self._session = session
+        self._timeout = aiohttp.ClientTimeout(total=timeout)
+
+    @property
+    def host(self) -> str:
+        return self._host
+
+    @property
+    def base_url(self) -> str:
+        if self._port == DEFAULT_PORT:
+            return f"http://{self._host}"
+        return f"http://{self._host}:{self._port}"
+
+    # -- low-level request helpers -----------------------------------------
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        data: dict[str, Any] | None = None,
+    ) -> str:
+        url = f"{self.base_url}{path}"
+        try:
+            async with self._session.request(
+                method, url, data=data, timeout=self._timeout
+            ) as resp:
+                body = await resp.text()
+                if resp.status == 409:
+                    raise ESPTimeCastBusyError(f"Device busy (409) for {method} {path}")
+                if resp.status >= 400:
+                    raise ESPTimeCastError(
+                        f"HTTP {resp.status} for {method} {path}: {body[:200]}"
+                    )
+                return body
+        except TimeoutError as err:
+            raise ESPTimeCastTimeoutError(f"Timeout for {method} {path}") from err
+        except aiohttp.ClientError as err:
+            raise ESPTimeCastConnectionError(
+                f"Connection error for {method} {path}: {err}"
+            ) from err
+
+    async def _get_json(self, path: str) -> dict[str, Any]:
+        url = f"{self.base_url}{path}"
+        try:
+            async with self._session.get(url, timeout=self._timeout) as resp:
+                if resp.status >= 400:
+                    raise ESPTimeCastError(f"HTTP {resp.status} for GET {path}")
+                # Firmware sends JSON but not always with a JSON content-type.
+                return await resp.json(content_type=None)
+        except TimeoutError as err:
+            raise ESPTimeCastTimeoutError(f"Timeout for GET {path}") from err
+        except aiohttp.ClientError as err:
+            raise ESPTimeCastConnectionError(
+                f"Connection error for GET {path}: {err}"
+            ) from err
+
+    # -- read API ----------------------------------------------------------
+
+    async def get_status(self) -> Status:
+        """Fetch and parse /status."""
+        return Status.from_dict(await self._get_json("/status"))
+
+    async def get_version(self) -> dict[str, Any]:
+        """Fetch /get_version -> {"version", "board"}."""
+        return await self._get_json("/get_version")
+
+    # -- generic command bus ----------------------------------------------
+
+    async def send_action(self, action: str, value: Any = "") -> str:
+        """POST a single action=value pair to /action."""
+        return await self._request(
+            "POST", "/action", data={action: _bool_to_int(value)}
+        )
+
+    # -- typed setters ------------------------------------------------------
+
+    async def _set(self, endpoint: str, value: Any) -> str:
+        return await self._request(
+            "POST", f"/set_{endpoint}", data={"value": _bool_to_int(value)}
+        )
+
+    async def set_brightness(self, value: int) -> None:
+        await self._set("brightness", int(value))
+
+    async def set_flip(self, value: bool) -> None:
+        await self._set("flip", value)
+
+    async def set_twelve_hour(self, value: bool) -> None:
+        await self._set("twelvehour", value)
+
+    async def set_day_of_week(self, value: bool) -> None:
+        await self._set("dayofweek", value)
+
+    async def set_show_date(self, value: bool) -> None:
+        await self._set("showdate", value)
+
+    async def set_humidity(self, value: bool) -> None:
+        await self._set("humidity", value)
+
+    async def set_colon_blink(self, value: bool) -> None:
+        await self._set("colon_blink", value)
+
+    async def set_weather_desc(self, value: bool) -> None:
+        await self._set("weatherdesc", value)
+
+    async def set_units(self, value: str) -> None:
+        """value: "metric" or "imperial"."""
+        await self._set("units", 0 if value == "metric" else 1)
+
+    async def set_language(self, value: str) -> None:
+        await self._set("language", value)
+
+    async def set_countdown_enabled(self, value: bool) -> None:
+        await self._set("countdown_enabled", value)
+
+    async def set_dramatic_countdown(self, value: bool) -> None:
+        await self._set("dramatic_countdown", value)
+
+    async def set_clock_only_dimming(self, value: bool) -> None:
+        await self._set("clock_only_dimming", value)
+
+    # -- convenience actions ------------------------------------------------
+
+    async def restart(self) -> None:
+        await self.send_action("restart")
+
+    async def next_mode(self) -> None:
+        await self.send_action("next_mode")
+
+    async def previous_mode(self) -> None:
+        await self.send_action("prev_mode")
+
+    async def go_to_mode(self, mode: str | int) -> None:
+        await self.send_action("go_to_mode", mode)
+
+    async def set_display_off(self, value: bool) -> None:
+        # The firmware exposes display power as a toggle action.
+        await self.send_action("display_off", value)
+
+    async def enable_rotation(self, value: bool) -> None:
+        await self.send_action("enable_rotation", value)
+
+    async def clear_message(self) -> None:
+        await self.send_action("clear_message")
+
+    async def start_timer(self, spec: str) -> None:
+        """spec e.g. "5M", "1H30M", "90S"."""
+        await self.send_action("timer", spec)
+
+    async def stop_timer(self) -> None:
+        await self.send_action("timer_stop")
+
+    async def start_stopwatch(self) -> None:
+        await self.send_action("stopwatch_start")
+
+    async def stop_stopwatch(self) -> None:
+        await self.send_action("stopwatch_stop")
+
+    async def start_pomodoro(self, spec: str) -> None:
+        """spec e.g. "25-5-15"."""
+        await self.send_action("pomodoro", spec)
+
+    async def restart_pomodoro(self) -> None:
+        await self.send_action("pomodoro_restart")
+
+    # -- messages -----------------------------------------------------------
+
+    async def send_message(
+        self,
+        message: str,
+        *,
+        speed: int | None = None,
+        scrolls: int | None = None,
+        seconds: int | None = None,
+        big_numbers: bool | None = None,
+        interrupt: bool | None = None,
+    ) -> None:
+        """Display a scrolling message via /set_custom_message.
+
+        Only the parameters that are explicitly provided are sent.
+        """
+        data: dict[str, Any] = {"message": message}
+        if speed is not None:
+            data["speed"] = int(speed)
+        if scrolls is not None:
+            data["scrolltimes"] = int(scrolls)
+        if seconds is not None:
+            data["seconds"] = int(seconds)
+        if big_numbers is not None:
+            data["bignumbers"] = 1 if big_numbers else 0
+        if interrupt is not None:
+            data["allowInterrupt"] = 1 if interrupt else 0
+        await self._request("POST", "/set_custom_message", data=data)

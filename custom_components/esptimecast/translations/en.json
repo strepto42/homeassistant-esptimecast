@@ -1,0 +1,167 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Connect to ESPTimeCast",
+        "description": "Enter the hostname or IP address of your ESPTimeCast device.",
+        "data": {
+          "host": "Host"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "ESPTimeCast",
+        "description": "Do you want to add the ESPTimeCast device {name}?"
+      }
+    },
+    "abort": {
+      "already_configured": "This ESPTimeCast device is already configured.",
+      "cannot_connect": "Failed to connect to the device.",
+      "not_esptimecast": "Discovered device does not appear to be an ESPTimeCast."
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check the host and that the device is online."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "weather_description": { "name": "Weather description" },
+      "session_runtime": { "name": "Session runtime" },
+      "mode": { "name": "Display mode" },
+      "message": { "name": "Current message" },
+      "sunrise": { "name": "Sunrise" },
+      "sunset": { "name": "Sunset" },
+      "countdown_remaining": { "name": "Countdown remaining" },
+      "glucose": { "name": "Glucose" }
+    },
+    "binary_sensor": {
+      "display_on": { "name": "Display" },
+      "time_synced": { "name": "Time synced" },
+      "display_busy": { "name": "Display busy" },
+      "dimming_active": { "name": "Dimming active" },
+      "glucose_outdated": { "name": "Glucose outdated" }
+    },
+    "switch": {
+      "display": { "name": "Display" },
+      "flip": { "name": "Flip display" },
+      "twelve_hour": { "name": "12-hour clock" },
+      "show_date": { "name": "Show date" },
+      "show_humidity": { "name": "Show humidity" },
+      "countdown": { "name": "Countdown" },
+      "dramatic_countdown": { "name": "Dramatic countdown" },
+      "clock_only_dimming": { "name": "Clock only during dimming" }
+    },
+    "number": {
+      "brightness": { "name": "Brightness" }
+    },
+    "select": {
+      "display_mode": { "name": "Display mode" },
+      "language": { "name": "Language" },
+      "units": { "name": "Units" }
+    },
+    "button": {
+      "next_mode": { "name": "Next mode" },
+      "previous_mode": { "name": "Previous mode" },
+      "save_config": { "name": "Save configuration" },
+      "stop_timer": { "name": "Stop timer" },
+      "stop_stopwatch": { "name": "Stop stopwatch" },
+      "restart_pomodoro": { "name": "Restart pomodoro" },
+      "clear_message": { "name": "Clear message" }
+    },
+    "notify": {
+      "message": { "name": "Message" }
+    }
+  },
+  "services": {
+    "send_message": {
+      "name": "Send message",
+      "description": "Displays a scrolling message on the device.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The ESPTimeCast device to target."
+        },
+        "message": { "name": "Message", "description": "Text to display." },
+        "speed": {
+          "name": "Speed",
+          "description": "Scroll speed (10-200; lower is faster)."
+        },
+        "scrolls": {
+          "name": "Scrolls",
+          "description": "Number of scroll cycles (0 = infinite)."
+        },
+        "seconds": {
+          "name": "Auto-clear",
+          "description": "Clear the message after this many seconds (0 = never)."
+        },
+        "big_numbers": {
+          "name": "Big numbers",
+          "description": "Use the large font."
+        },
+        "interrupt": {
+          "name": "Interruptible",
+          "description": "Allow this message to be interrupted by another."
+        }
+      }
+    },
+    "start_timer": {
+      "name": "Start timer",
+      "description": "Starts a countdown timer.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The ESPTimeCast device to target."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Timer duration, e.g. 5M, 1H30M, 90S."
+        }
+      }
+    },
+    "start_pomodoro": {
+      "name": "Start pomodoro",
+      "description": "Starts a pomodoro session.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The ESPTimeCast device to target."
+        },
+        "spec": {
+          "name": "Specification",
+          "description": "Work-break-longbreak minutes, e.g. 25-5-15."
+        }
+      }
+    },
+    "start_stopwatch": {
+      "name": "Start stopwatch",
+      "description": "Starts the stopwatch.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The ESPTimeCast device to target."
+        }
+      }
+    },
+    "go_to_mode": {
+      "name": "Go to mode",
+      "description": "Switches the display to a specific mode.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The ESPTimeCast device to target."
+        },
+        "mode": { "name": "Mode", "description": "Display mode to switch to." }
+      }
+    },
+    "clear_message": {
+      "name": "Clear message",
+      "description": "Clears any temporary message on the display.",
+      "fields": {
+        "device_id": {
+          "name": "Device",
+          "description": "The ESPTimeCast device to target."
+        }
+      }
+    }
+  }
+}

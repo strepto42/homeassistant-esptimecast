@@ -1,0 +1,55 @@
+[project]
+name = "homeassistant-esptimecast"
+version = "0.1.0"
+description = "Home Assistant integration for ESPTimeCast LED matrix clock & weather displays."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Mark Cocquio" }]
+dependencies = ["aiohttp>=3.9"]
+
+[project.optional-dependencies]
+# Client-layer tests run anywhere (incl. Windows).
+test = ["pytest>=8", "pytest-asyncio>=0.24", "aioresponses>=0.7"]
+# Full HA integration tests. Installs `homeassistant`, which is Linux/macOS
+# oriented (uvloop etc.) — run these in CI or WSL, not native Windows.
+test-ha = ["pytest-homeassistant-custom-component>=0.13"]
+dev = ["ruff>=0.6", "mypy>=1.11"]
+
+[project.urls]
+Homepage = "https://github.com/strepto42/homeassistant-esptimecast"
+Issues = "https://github.com/strepto42/homeassistant-esptimecast/issues"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# This repo is a Home Assistant custom integration, not a distributable
+# package. Declaring no modules keeps `pip install -e .` to metadata + deps
+# only and avoids setuptools flat-layout auto-discovery (which otherwise
+# generates a broken editable finder over custom_components/ and tests/).
+py-modules = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# Put the repo root on sys.path so `custom_components.esptimecast` imports
+# without an editable install of this project.
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components"]
+
+[tool.mypy]
+python_version = "3.13"
+warn_unused_ignores = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
