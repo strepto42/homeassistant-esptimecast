@@ -251,6 +251,29 @@ async def test_restart_sends_restart_action(client):
         assert req.kwargs["data"] == {"restart": ""}
 
 
+async def test_save_config_posts_form(client):
+    with aioresponses() as m:
+        m.post("http://esptimecast.local/save", status=200, body="OK")
+        await client.save_config(
+            {
+                "clockDuration": 12000,
+                "dimmingEnabled": True,
+                "countdownEnabled": False,
+                "hostname": "lobby",
+                "openWeatherApiKey": None,  # unchanged -> omitted
+            }
+        )
+        req = m.requests[("POST", _url("http://esptimecast.local/save"))][0]
+        data = req.kwargs["data"]
+        assert data["clockDuration"] == 12000
+        # Booleans must be sent as the firmware's "true"/"false" strings.
+        assert data["dimmingEnabled"] == "true"
+        assert data["countdownEnabled"] == "false"
+        assert data["hostname"] == "lobby"
+        # None values are dropped (e.g. a masked secret left unchanged).
+        assert "openWeatherApiKey" not in data
+
+
 async def test_send_message_posts_all_params(client):
     with aioresponses() as m:
         m.post("http://esptimecast.local/set_custom_message", status=200, body="OK")

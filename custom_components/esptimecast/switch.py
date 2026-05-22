@@ -145,33 +145,38 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class ESPTimeCastSwitch(ESPTimeCastEntity, SwitchEntity):
-    """A switch whose state is read live from /status (optimistic on change)."""
+class _OptimisticSwitch(ESPTimeCastEntity, SwitchEntity):
+    """Base switch that holds an optimistic value until the device confirms it.
 
-    entity_description: ESPTimeCastSwitchDescription
+    This avoids the "jump" where a poll that lands before the device has applied
+    a change briefly reverts the switch. The optimistic value is only released
+    once the polled state matches it; later external changes are then reflected.
+    """
 
-    def __init__(
-        self,
-        coordinator: ESPTimeCastCoordinator,
-        description: ESPTimeCastSwitchDescription,
-    ) -> None:
-        super().__init__(coordinator, description.key)
-        self.entity_description = description
+    def __init__(self, coordinator: ESPTimeCastCoordinator, key: str) -> None:
+        super().__init__(coordinator, key)
         self._optimistic: bool | None = None
+
+    def _device_state(self) -> bool:
+        raise NotImplementedError
+
+    async def _device_set(self, on: bool) -> None:
+        raise NotImplementedError
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        self._optimistic = None
+        if self._optimistic is not None and self._device_state() == self._optimistic:
+            self._optimistic = None
         super()._handle_coordinator_update()
 
     @property
     def is_on(self) -> bool:
         if self._optimistic is not None:
             return self._optimistic
-        return self.entity_description.value_fn(self.coordinator.data)
+        return self._device_state()
 
     async def _async_set(self, on: bool) -> None:
-        await self.entity_description.set_fn(self.coordinator.client, on)
+        await self._device_set(on)
         self._optimistic = on
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
@@ -183,8 +188,33 @@ class ESPTimeCastSwitch(ESPTimeCastEntity, SwitchEntity):
         await self._async_set(False)
 
 
-class ESPTimeCastStoredSwitch(ESPTimeCastEntity, SwitchEntity):
-    """A toggle /status does not report; state held locally after each command."""
+class ESPTimeCastSwitch(_OptimisticSwitch):
+    """A switch whose state is read live from /status."""
+
+    entity_description: ESPTimeCastSwitchDescription
+
+    def __init__(
+        self,
+        coordinator: ESPTimeCastCoordinator,
+        description: ESPTimeCastSwitchDescription,
+    ) -> None:
+        super().__init__(coordinator, description.key)
+        self.entity_description = description
+
+    def _device_state(self) -> bool:
+        return self.entity_description.value_fn(self.coordinator.data)
+
+    async def _device_set(self, on: bool) -> None:
+        await self.entity_description.set_fn(self.coordinator.client, on)
+
+
+class ESPTimeCastStoredSwitch(_OptimisticSwitch):
+    """A toggle /status does not report; state comes from the saved config.
+
+    /status never reports these, so the state reflects the last-saved
+    /config.json value (what the web UI's settings form shows), with an
+    optimistic override after a toggle that holds until the saved config agrees.
+    """
 
     entity_description: ESPTimeCastStoredSwitchDescription
 
@@ -195,18 +225,9 @@ class ESPTimeCastStoredSwitch(ESPTimeCastEntity, SwitchEntity):
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description
-        self._is_on = description.seed_fn(coordinator.data.config)
 
-    @property
-    def is_on(self) -> bool:
-        return self._is_on
+    def _device_state(self) -> bool:
+        return self.entity_description.seed_fn(self.coordinator.data.config)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        await self.entity_description.set_fn(self.coordinator.client, True)
-        self._is_on = True
-        self.async_write_ha_state()
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        await self.entity_description.set_fn(self.coordinator.client, False)
-        self._is_on = False
-        self.async_write_ha_state()
+    async def _device_set(self, on: bool) -> None:
+        await self.entity_description.set_fn(self.coordinator.client, on)

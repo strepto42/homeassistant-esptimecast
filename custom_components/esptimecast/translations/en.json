@@ -23,6 +23,38 @@
       "cannot_connect": "Failed to connect. Check the host and that the device is online."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ESPTimeCast settings",
+        "description": "These settings are saved to the device, which reboots to apply them (~10–20s). Wi-Fi is not configurable here.",
+        "data": {
+          "time_zone": "Time zone",
+          "clock_duration": "Clock duration",
+          "weather_duration": "Weather duration",
+          "ntp_server1": "Primary NTP server",
+          "ntp_server2": "Secondary NTP server",
+          "hostname": "Hostname",
+          "openweather_api_key": "OpenWeather API key (blank = unchanged)",
+          "latitude": "Location latitude",
+          "longitude": "Location longitude",
+          "dimming_enabled": "Dimming enabled",
+          "dim_start": "Dim start time",
+          "dim_end": "Dim end time",
+          "dim_brightness": "Dim brightness (-1 = off)",
+          "auto_dimming": "Auto-dimming (sunrise/sunset)",
+          "countdown_enabled": "Countdown enabled",
+          "countdown_date": "Countdown date",
+          "countdown_time": "Countdown time",
+          "countdown_label": "Countdown label",
+          "dramatic_countdown": "Dramatic countdown"
+        }
+      }
+    },
+    "error": {
+      "save_failed": "Failed to save settings to the device."
+    }
+  },
   "entity": {
     "sensor": {
       "weather_description": { "name": "Weather description" },

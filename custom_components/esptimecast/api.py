@@ -522,6 +522,28 @@ class ESPTimeCastClient:
             "POST", "/action", data={action: _bool_to_int(value)}
         )
 
+    # -- persisted settings -------------------------------------------------
+
+    async def save_config(self, fields: dict[str, Any]) -> None:
+        """Persist settings via POST /save (the device reboots afterwards).
+
+        ``fields`` keys are raw firmware config names (e.g. ``clockDuration``,
+        ``dimmingEnabled``, ``countdownDate``). Booleans are sent as the
+        firmware's "true"/"false" strings; ``None`` values are dropped (used to
+        leave masked secrets unchanged). The firmware merges these into the
+        existing config and rebuilds the countdown object from the posted
+        ``countdown*`` params, so callers must include all of those together.
+        """
+        data: dict[str, Any] = {}
+        for key, value in fields.items():
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                data[key] = "true" if value else "false"
+            else:
+                data[key] = value
+        await self._request("POST", "/save", data=data)
+
     # -- typed setters ------------------------------------------------------
 
     async def _set(self, endpoint: str, value: Any) -> str:

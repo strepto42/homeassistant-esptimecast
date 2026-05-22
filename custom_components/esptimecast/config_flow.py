@@ -6,12 +6,19 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .api import ESPTimeCastClient, ESPTimeCastError, Status
 from .const import CONF_HOST, DOMAIN
+from .options_flow import ESPTimeCastOptionsFlow
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,6 +33,11 @@ class ESPTimeCastConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._host: str | None = None
         self._title: str = "ESPTimeCast"
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return ESPTimeCastOptionsFlow()
 
     async def _async_probe(self, host: str) -> Status:
         """Confirm a host is an ESPTimeCast and return its status."""

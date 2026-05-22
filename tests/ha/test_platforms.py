@@ -131,6 +131,77 @@ async def test_optimistic_switch_toggle(
     assert hass.states.get(entity_id).state == STATE_ON
 
 
+async def test_live_switch_holds_optimistic_until_confirmed(
+    hass: HomeAssistant, mock_client, mock_config_entry, device_data
+) -> None:
+    # Issue: switches "jump" when a poll lands before the device has applied
+    # the change. The optimistic value must hold until /status confirms it.
+    await _setup(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+    entity_id = "switch.esptimecast_local_flip_display"
+    assert hass.states.get(entity_id).state == STATE_OFF
+
+    with patch(
+        "custom_components.esptimecast.api.ESPTimeCastClient.set_flip",
+        new=AsyncMock(),
+    ):
+        await hass.services.async_call(
+            Platform.SWITCH, "turn_on", {ATTR_ENTITY_ID: entity_id}, blocking=True
+        )
+    assert hass.states.get(entity_id).state == STATE_ON
+
+    # A poll that still reports the OLD value must NOT flip it back.
+    device_data.status.config.flip_display = False
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == STATE_ON
+
+    # Once the device confirms, the optimistic value is released...
+    device_data.status.config.flip_display = True
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == STATE_ON
+
+    # ...and a later external change is reflected.
+    device_data.status.config.flip_display = False
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == STATE_OFF
+
+
+async def test_units_select_holds_optimistic_until_confirmed(
+    hass: HomeAssistant, mock_client, mock_config_entry, device_data
+) -> None:
+    await _setup(hass, mock_config_entry)
+    coordinator = mock_config_entry.runtime_data
+    entity_id = "select.esptimecast_local_units"
+    assert hass.states.get(entity_id).state == "metric"
+
+    with patch(
+        "custom_components.esptimecast.api.ESPTimeCastClient.set_units",
+        new=AsyncMock(),
+    ):
+        await hass.services.async_call(
+            Platform.SELECT,
+            "select_option",
+            {ATTR_ENTITY_ID: entity_id, "option": "imperial"},
+            blocking=True,
+        )
+    assert hass.states.get(entity_id).state == "imperial"
+
+    # Stale poll (device not applied yet) must not revert the selection.
+    device_data.status.config.weather_units = "metric"
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "imperial"
+
+    # Device confirms.
+    device_data.status.config.weather_units = "imperial"
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "imperial"
+
+
 async def test_save_settings_button(
     hass: HomeAssistant, mock_client, mock_config_entry
 ) -> None:
