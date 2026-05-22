@@ -38,7 +38,9 @@ BINARY_SENSORS: tuple[ESPTimeCastBinarySensorDescription, ...] = (
         key="dimming_active",
         translation_key="dimming_active",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda d: d.status.dimming.enabled,
+        # True only while the display is actually dimmed right now (auto
+        # sunset->sunrise or the scheduled window), not merely "dimming enabled".
+        value_fn=lambda d: d.status.dimming_active,
     ),
 )
 

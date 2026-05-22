@@ -30,6 +30,8 @@
         "description": "These settings are saved to the device, which reboots to apply them (~10–20s). Wi-Fi is not configurable here.",
         "data": {
           "time_zone": "Time zone",
+          "language": "Language",
+          "units": "Units",
           "clock_duration": "Clock duration",
           "weather_duration": "Weather duration",
           "ntp_server1": "Primary NTP server",
@@ -77,23 +79,16 @@
       "show_humidity": { "name": "Show humidity" },
       "animated_seconds": { "name": "Animated seconds" },
       "show_weather_description": { "name": "Show weather description" },
-      "countdown": { "name": "Countdown" },
-      "dramatic_countdown": { "name": "Dramatic countdown" },
       "clock_only_dimming": { "name": "Clock only during dimming" },
       "hide_donation": { "name": "Hide donation message" }
     },
     "light": {
       "display": { "name": "Display" }
     },
-    "select": {
-      "language": { "name": "Language" },
-      "units": { "name": "Units" }
-    },
     "button": {
       "next_mode": { "name": "Next mode" },
       "previous_mode": { "name": "Previous mode" },
-      "clear_message": { "name": "Clear message" },
-      "save_settings": { "name": "Save settings to device" }
+      "clear_message": { "name": "Clear message" }
     },
     "text": {
       "custom_message": { "name": "Custom message" }

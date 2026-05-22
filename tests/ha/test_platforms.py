@@ -169,56 +169,6 @@ async def test_live_switch_holds_optimistic_until_confirmed(
     assert hass.states.get(entity_id).state == STATE_OFF
 
 
-async def test_units_select_holds_optimistic_until_confirmed(
-    hass: HomeAssistant, mock_client, mock_config_entry, device_data
-) -> None:
-    await _setup(hass, mock_config_entry)
-    coordinator = mock_config_entry.runtime_data
-    entity_id = "select.esptimecast_local_units"
-    assert hass.states.get(entity_id).state == "metric"
-
-    with patch(
-        "custom_components.esptimecast.api.ESPTimeCastClient.set_units",
-        new=AsyncMock(),
-    ):
-        await hass.services.async_call(
-            Platform.SELECT,
-            "select_option",
-            {ATTR_ENTITY_ID: entity_id, "option": "imperial"},
-            blocking=True,
-        )
-    assert hass.states.get(entity_id).state == "imperial"
-
-    # Stale poll (device not applied yet) must not revert the selection.
-    device_data.status.config.weather_units = "metric"
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
-    assert hass.states.get(entity_id).state == "imperial"
-
-    # Device confirms.
-    device_data.status.config.weather_units = "imperial"
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
-    assert hass.states.get(entity_id).state == "imperial"
-
-
-async def test_save_settings_button(
-    hass: HomeAssistant, mock_client, mock_config_entry
-) -> None:
-    await _setup(hass, mock_config_entry)
-    with patch(
-        "custom_components.esptimecast.api.ESPTimeCastClient.send_action",
-        new=AsyncMock(),
-    ) as mock_action:
-        await hass.services.async_call(
-            Platform.BUTTON,
-            "press",
-            {ATTR_ENTITY_ID: "button.esptimecast_local_save_settings_to_device"},
-            blocking=True,
-        )
-    mock_action.assert_awaited_once_with("save")
-
-
 async def test_display_light_state_and_brightness(
     hass: HomeAssistant, mock_client, mock_config_entry
 ) -> None:
@@ -287,27 +237,27 @@ async def test_flip_switch_sets_value(
     mock_set.assert_awaited_once_with(True)
 
 
-async def test_select_units(
-    hass: HomeAssistant, mock_client, mock_config_entry
+async def test_dimming_active_reflects_schedule(
+    hass: HomeAssistant, mock_client, mock_config_entry, device_data
 ) -> None:
+    # Auto-dimming on, sunset 17:04 -> sunrise 06:24. At 20:00 it is dimmed;
+    # in the fixture (11:03) it is not. The diagnostic must track this, not the
+    # mere "dimming enabled" setting.
+    device_data.status.local_time = "20:00:00"
     await _setup(hass, mock_config_entry)
-    units = hass.states.get("select.esptimecast_local_units")
-    assert units.state == "metric"
+    coordinator = mock_config_entry.runtime_data
+    assert (
+        hass.states.get("binary_sensor.esptimecast_local_dimming_active").state
+        == STATE_ON
+    )
 
-    with patch(
-        "custom_components.esptimecast.api.ESPTimeCastClient.set_units",
-        new=AsyncMock(),
-    ) as mock_set:
-        await hass.services.async_call(
-            Platform.SELECT,
-            "select_option",
-            {
-                ATTR_ENTITY_ID: "select.esptimecast_local_units",
-                "option": "imperial",
-            },
-            blocking=True,
-        )
-    mock_set.assert_awaited_once_with("imperial")
+    device_data.status.local_time = "11:03:36"
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert (
+        hass.states.get("binary_sensor.esptimecast_local_dimming_active").state
+        == STATE_OFF
+    )
 
 
 async def test_button_restart(
@@ -338,6 +288,5 @@ async def test_entities_have_unique_ids(
     assert any(e.startswith("sensor.esptimecast_local") for e in entity_ids)
     assert any(e.startswith("switch.esptimecast_local") for e in entity_ids)
     assert any(e.startswith("button.esptimecast_local") for e in entity_ids)
-    assert any(e.startswith("select.esptimecast_local") for e in entity_ids)
     assert any(e.startswith("light.esptimecast_local") for e in entity_ids)
     assert any(e.startswith("text.esptimecast_local") for e in entity_ids)

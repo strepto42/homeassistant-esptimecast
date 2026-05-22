@@ -54,14 +54,6 @@ BUTTONS: tuple[ESPTimeCastButtonDescription, ...] = (
         press_fn=lambda c: c.clear_message(),
         refresh=True,
     ),
-    ESPTimeCastButtonDescription(
-        key="save_settings",
-        translation_key="save_settings",
-        entity_category=EntityCategory.CONFIG,
-        # Persists the current live runtime (brightness, toggles, ...) to the
-        # device's flash so it survives a reboot. No reboot, no /save form.
-        press_fn=lambda c: c.send_action("save"),
-    ),
 )
 
 

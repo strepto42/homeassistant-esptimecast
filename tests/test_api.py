@@ -101,6 +101,39 @@ async def test_get_status_nightscout_inactive(client, status_payload):
     assert ns.is_outdated is True
 
 
+def test_dimming_active_auto_window(api_module, status_payload):
+    # Fixture: autoDimmingEnabled true, dimmingEnabled false, sunset 17:04,
+    # sunrise 06:24. Auto-dimming applies even when dimmingEnabled is false.
+    status_payload["localTime"] = "20:00:00"
+    status = api_module.Status.from_dict(status_payload)
+    assert status.dimming_active is True  # inside sunset->sunrise overnight window
+
+    status_payload["localTime"] = "12:00:00"
+    status = api_module.Status.from_dict(status_payload)
+    assert status.dimming_active is False  # daytime
+
+
+def test_dimming_active_manual_window(api_module, status_payload):
+    status_payload["dimming"]["autoDimmingEnabled"] = False
+    status_payload["dimming"]["dimmingEnabled"] = True
+    status_payload["dimming"]["dimStartHour"] = 18
+    status_payload["dimming"]["dimStartMinute"] = 0
+    status_payload["dimming"]["dimEndHour"] = 8
+    status_payload["dimming"]["dimEndMinute"] = 0
+
+    status_payload["localTime"] = "20:00:00"
+    assert api_module.Status.from_dict(status_payload).dimming_active is True
+    status_payload["localTime"] = "12:00:00"
+    assert api_module.Status.from_dict(status_payload).dimming_active is False
+
+
+def test_dimming_active_off_when_disabled(api_module, status_payload):
+    status_payload["dimming"]["autoDimmingEnabled"] = False
+    status_payload["dimming"]["dimmingEnabled"] = False
+    status_payload["localTime"] = "20:00:00"
+    assert api_module.Status.from_dict(status_payload).dimming_active is False
+
+
 async def test_get_status_config_parsing(client, status_payload):
     with aioresponses() as m:
         m.get("http://esptimecast.local/status", payload=status_payload)
