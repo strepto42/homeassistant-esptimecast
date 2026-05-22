@@ -1,8 +1,10 @@
 send_message:
-  target:
-    device:
-      - integration: esptimecast
   fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: esptimecast
     message:
       required: true
       example: "HELLO WORLD"
@@ -37,10 +39,12 @@ send_message:
         boolean:
 
 start_timer:
-  target:
-    device:
-      - integration: esptimecast
   fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: esptimecast
     duration:
       required: true
       example: "5M"
@@ -48,10 +52,12 @@ start_timer:
         text:
 
 start_pomodoro:
-  target:
-    device:
-      - integration: esptimecast
   fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: esptimecast
     spec:
       required: true
       example: "25-5-15"
@@ -59,15 +65,20 @@ start_pomodoro:
         text:
 
 start_stopwatch:
-  target:
-    device:
-      - integration: esptimecast
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: esptimecast
 
 go_to_mode:
-  target:
-    device:
-      - integration: esptimecast
   fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: esptimecast
     mode:
       required: true
       example: "clock"
@@ -84,6 +95,9 @@ go_to_mode:
             - timer
 
 clear_message:
-  target:
-    device:
-      - integration: esptimecast
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: esptimecast
