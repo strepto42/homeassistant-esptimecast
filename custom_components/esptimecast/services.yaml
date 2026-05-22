@@ -1,7 +1,7 @@
 send_message:
   target:
     device:
-      integration: esptimecast
+      - integration: esptimecast
   fields:
     message:
       required: true
@@ -39,7 +39,7 @@ send_message:
 start_timer:
   target:
     device:
-      integration: esptimecast
+      - integration: esptimecast
   fields:
     duration:
       required: true
@@ -50,7 +50,7 @@ start_timer:
 start_pomodoro:
   target:
     device:
-      integration: esptimecast
+      - integration: esptimecast
   fields:
     spec:
       required: true
@@ -61,12 +61,12 @@ start_pomodoro:
 start_stopwatch:
   target:
     device:
-      integration: esptimecast
+      - integration: esptimecast
 
 go_to_mode:
   target:
     device:
-      integration: esptimecast
+      - integration: esptimecast
   fields:
     mode:
       required: true
@@ -86,4 +86,4 @@ go_to_mode:
 clear_message:
   target:
     device:
-      integration: esptimecast
+      - integration: esptimecast
