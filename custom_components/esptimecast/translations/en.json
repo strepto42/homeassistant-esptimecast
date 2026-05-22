@@ -26,16 +26,11 @@
   "entity": {
     "sensor": {
       "weather_description": { "name": "Weather description" },
-      "session_runtime": { "name": "Session runtime" },
-      "mode": { "name": "Display mode" },
-      "message": { "name": "Current message" },
-      "sunrise": { "name": "Sunrise" },
-      "sunset": { "name": "Sunset" },
+      "uptime": { "name": "Uptime" },
       "countdown_remaining": { "name": "Countdown remaining" },
       "glucose": { "name": "Glucose" }
     },
     "binary_sensor": {
-      "display_on": { "name": "Display" },
       "time_synced": { "name": "Time synced" },
       "display_busy": { "name": "Display busy" },
       "dimming_active": { "name": "Dimming active" },
@@ -45,11 +40,15 @@
       "display": { "name": "Display" },
       "flip": { "name": "Flip display" },
       "twelve_hour": { "name": "12-hour clock" },
+      "show_day_of_week": { "name": "Show day of week" },
       "show_date": { "name": "Show date" },
       "show_humidity": { "name": "Show humidity" },
+      "colon_blink": { "name": "Blinking colon" },
+      "show_weather_description": { "name": "Show weather description" },
       "countdown": { "name": "Countdown" },
       "dramatic_countdown": { "name": "Dramatic countdown" },
-      "clock_only_dimming": { "name": "Clock only during dimming" }
+      "clock_only_dimming": { "name": "Clock only during dimming" },
+      "hide_donation": { "name": "Hide donation message" }
     },
     "number": {
       "brightness": { "name": "Brightness" }
@@ -70,6 +69,9 @@
     },
     "notify": {
       "message": { "name": "Message" }
+    },
+    "text": {
+      "custom_message": { "name": "Custom message" }
     }
   },
   "services": {

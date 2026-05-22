@@ -148,6 +148,46 @@ async def test_get_status_tolerates_raw_control_chars(client):
     assert status.weather.icon is None  # control-only glyph reduces to nothing
 
 
+# --- get_config (full /config.json) -----------------------------------------
+
+
+async def test_get_config_parsing(client, config_payload):
+    with aioresponses() as m:
+        m.get("http://esptimecast.local/config.json", payload=config_payload)
+        cfg = await client.get_config()
+
+    # Settings the /status block did not expose.
+    assert cfg.show_day_of_week is False
+    assert cfg.colon_blink is True
+    assert cfg.show_weather_description is True
+    assert cfg.custom_message == ""
+    assert cfg.hostname == "esptimecast"
+    assert cfg.clock_duration == 10000
+    assert cfg.weather_duration == 5000
+    # String booleans must be coerced.
+    assert cfg.auto_dimming is True
+    assert cfg.countdown.enabled is False
+    assert cfg.countdown.is_dramatic is True
+    # dimming schedule
+    assert cfg.dim_start == time(18, 0)
+    assert cfg.dim_end == time(8, 0)
+    assert cfg.hide_donation_msg is True
+    # secrets reported as configured, never leaked
+    assert cfg.has_api_key is True
+
+
+async def test_get_device_data_combines_status_and_config(
+    client, status_payload, config_payload
+):
+    with aioresponses() as m:
+        m.get("http://esptimecast.local/status", payload=status_payload)
+        m.get("http://esptimecast.local/config.json", payload=config_payload)
+        data = await client.get_device_data()
+
+    assert data.status.mode == "weather"
+    assert data.config.hostname == "esptimecast"
+
+
 # --- get_version ------------------------------------------------------------
 
 

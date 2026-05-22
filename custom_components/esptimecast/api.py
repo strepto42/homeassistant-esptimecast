@@ -74,6 +74,17 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
+def _to_bool(value: Any) -> bool:
+    # /config.json encodes some booleans as the strings "true"/"false".
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "on", "yes")
+    return False
+
+
 def _hm_to_time(hour: Any, minute: Any) -> time | None:
     h = _to_int(hour)
     m = _to_int(minute)
@@ -277,6 +288,110 @@ class Status:
         )
 
 
+@dataclass(slots=True)
+class CountdownConfig:
+    """Countdown settings as stored in /config.json."""
+
+    enabled: bool
+    target_timestamp: int | None
+    label: str
+    is_dramatic: bool
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CountdownConfig:
+        return cls(
+            enabled=_to_bool(data.get("enabled", False)),
+            target_timestamp=_to_int(data.get("targetTimestamp")),
+            label=data.get("label", "") or "",
+            is_dramatic=_to_bool(data.get("isDramaticCountdown", False)),
+        )
+
+
+@dataclass(slots=True)
+class FullConfig:
+    """The full persisted configuration from /config.json.
+
+    This is richer than Status.config (the /status block exposes only a
+    subset). It is the source of truth for the device's settings, including
+    toggles that /status does not report (day-of-week, colon blink, weather
+    description) and the persistent custom message.
+    """
+
+    brightness: int | None
+    clock_duration: int | None
+    weather_duration: int | None
+    flip_display: bool
+    twelve_hour: bool
+    show_day_of_week: bool
+    show_date: bool
+    show_humidity: bool
+    colon_blink: bool
+    show_weather_description: bool
+    weather_units: str | None
+    language: str | None
+    time_zone: str | None
+    hostname: str | None
+    ntp_server1: str | None
+    ntp_server2: str | None
+    dimming_enabled: bool
+    dim_start: time | None
+    dim_end: time | None
+    dim_brightness: int | None
+    auto_dimming: bool
+    clock_only_dimming: bool
+    countdown: CountdownConfig
+    custom_message: str
+    hide_donation_msg: bool
+    latitude: str | None
+    longitude: str | None
+    has_api_key: bool
+    raw: dict[str, Any] = field(repr=False)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> FullConfig:
+        # A non-empty value (the asterisk mask or a real key) means configured.
+        has_key = bool(data.get("openWeatherApiKey"))
+        return cls(
+            brightness=_to_int(data.get("brightness")),
+            clock_duration=_to_int(data.get("clockDuration")),
+            weather_duration=_to_int(data.get("weatherDuration")),
+            flip_display=_to_bool(data.get("flipDisplay")),
+            twelve_hour=_to_bool(data.get("twelveHourToggle")),
+            show_day_of_week=_to_bool(data.get("showDayOfWeek")),
+            show_date=_to_bool(data.get("showDate")),
+            show_humidity=_to_bool(data.get("showHumidity")),
+            colon_blink=_to_bool(data.get("colonBlinkEnabled")),
+            show_weather_description=_to_bool(data.get("showWeatherDescription")),
+            weather_units=data.get("weatherUnits") or None,
+            language=data.get("language") or None,
+            time_zone=data.get("timeZone") or None,
+            hostname=data.get("hostname") or None,
+            ntp_server1=data.get("ntpServer1") or None,
+            ntp_server2=data.get("ntpServer2") or None,
+            dimming_enabled=_to_bool(data.get("dimmingEnabled")),
+            dim_start=_hm_to_time(data.get("dimStartHour"), data.get("dimStartMinute")),
+            dim_end=_hm_to_time(data.get("dimEndHour"), data.get("dimEndMinute")),
+            dim_brightness=_to_int(data.get("dimBrightness")),
+            auto_dimming=_to_bool(data.get("autoDimmingEnabled")),
+            clock_only_dimming=_to_bool(data.get("clockOnlyDuringDimming")),
+            countdown=CountdownConfig.from_dict(data.get("countdown", {}) or {}),
+            custom_message=data.get("customMessage", "") or "",
+            hide_donation_msg=_to_bool(data.get("hideDonationMsg")),
+            latitude=data.get("openWeatherCity") or None,
+            longitude=data.get("openWeatherCountry") or None,
+            has_api_key=has_key,
+            raw=data,
+        )
+
+
+@dataclass(slots=True)
+class DeviceData:
+    """Combined live state (/status) and persisted settings (/config.json)."""
+
+    status: Status
+    config: FullConfig
+
+
 # --- Client -----------------------------------------------------------------
 
 
@@ -381,6 +496,16 @@ class ESPTimeCastClient:
         """Fetch and parse /status."""
         return Status.from_dict(await self._get_json("/status"))
 
+    async def get_config(self) -> FullConfig:
+        """Fetch and parse the full /config.json settings."""
+        return FullConfig.from_dict(await self._get_json("/config.json"))
+
+    async def get_device_data(self) -> DeviceData:
+        """Fetch combined live state (/status) and settings (/config.json)."""
+        status = await self.get_status()
+        config = await self.get_config()
+        return DeviceData(status=status, config=config)
+
     async def get_version(self) -> dict[str, Any]:
         """Fetch /get_version -> {"version", "board"}."""
         return await self._get_json("/get_version")
@@ -423,6 +548,9 @@ class ESPTimeCastClient:
 
     async def set_weather_desc(self, value: bool) -> None:
         await self._set("weatherdesc", value)
+
+    async def set_hide_donation(self, value: bool) -> None:
+        await self._set("hide_donation", value)
 
     async def set_units(self, value: str) -> None:
         """value: "metric" or "imperial"."""
@@ -512,3 +640,18 @@ class ESPTimeCastClient:
         if interrupt is not None:
             data["allowInterrupt"] = 1 if interrupt else 0
         await self._request("POST", "/set_custom_message", data=data)
+
+    async def display_message(
+        self, message: str, *, scrolls: int = 0, seconds: int = 0
+    ) -> None:
+        """Set the persistent scrolling message via /action (web-UI parity).
+
+        Defaults (scrolls=0, seconds=0) scroll the message indefinitely with no
+        auto-clear, matching the web UI's Custom Message box. Passing an empty
+        message clears the display.
+        """
+        await self._request(
+            "POST",
+            "/action",
+            data={"message": message, "scrolls": scrolls, "seconds": seconds},
+        )

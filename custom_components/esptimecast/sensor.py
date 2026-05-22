@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import time
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -22,48 +21,60 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from .api import Status
+from .api import DeviceData
 from .coordinator import ESPTimeCastConfigEntry, ESPTimeCastCoordinator
 from .entity import ESPTimeCastEntity
 
 
-def _temp_unit(status: Status) -> str:
-    if status.config.weather_units == "imperial":
+def _temp_unit(data: DeviceData) -> str:
+    if data.config.weather_units == "imperial":
         return UnitOfTemperature.FAHRENHEIT
     return UnitOfTemperature.CELSIUS
 
 
-def _fmt_time(value: time | None) -> str | None:
-    return value.strftime("%H:%M") if value else None
+def _runtime_seconds(data: DeviceData) -> int | None:
+    # device_runtime is total uptime formatted "HH:MM:SS" (hours may exceed 24).
+    raw = data.status.device_runtime
+    if not raw:
+        return None
+    try:
+        parts = [int(p) for p in raw.split(":")]
+    except ValueError:
+        return None
+    seconds = 0
+    for part in parts:
+        seconds = seconds * 60 + part
+    return seconds
 
 
 @dataclass(frozen=True, kw_only=True)
 class ESPTimeCastSensorDescription(SensorEntityDescription):
     """Describes an ESPTimeCast sensor."""
 
-    value_fn: Callable[[Status], StateType]
-    unit_fn: Callable[[Status], str | None] | None = None
+    value_fn: Callable[[DeviceData], StateType]
+    unit_fn: Callable[[DeviceData], str | None] | None = None
 
 
+# Always-present sensors.
 SENSORS: tuple[ESPTimeCastSensorDescription, ...] = (
     ESPTimeCastSensorDescription(
         key="temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         unit_fn=_temp_unit,
-        value_fn=lambda s: s.weather.temperature,
+        value_fn=lambda d: d.status.weather.temperature,
     ),
     ESPTimeCastSensorDescription(
         key="humidity",
         device_class=SensorDeviceClass.HUMIDITY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
-        value_fn=lambda s: s.weather.humidity,
+        value_fn=lambda d: d.status.weather.humidity,
     ),
     ESPTimeCastSensorDescription(
         key="weather_description",
         translation_key="weather_description",
-        value_fn=lambda s: s.weather.description,
+        value_fn=lambda d: d.status.weather.description,
     ),
     ESPTimeCastSensorDescription(
         key="signal_strength",
@@ -72,52 +83,35 @@ SENSORS: tuple[ESPTimeCastSensorDescription, ...] = (
         native_unit_of_measurement="dBm",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
-        value_fn=lambda s: s.wifi_signal,
+        value_fn=lambda d: d.status.wifi_signal,
     ),
     ESPTimeCastSensorDescription(
-        key="session_runtime",
-        translation_key="session_runtime",
+        key="uptime",
+        translation_key="uptime",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
+        suggested_unit_of_measurement=UnitOfTime.HOURS,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
-        value_fn=lambda s: s.session_runtime,
+        value_fn=_runtime_seconds,
     ),
-    ESPTimeCastSensorDescription(
-        key="mode",
-        translation_key="mode",
-        value_fn=lambda s: s.mode,
-    ),
-    ESPTimeCastSensorDescription(
-        key="message",
-        translation_key="message",
-        value_fn=lambda s: s.message or None,
-    ),
-    ESPTimeCastSensorDescription(
-        key="sunrise",
-        translation_key="sunrise",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda s: _fmt_time(s.weather.sunrise),
-    ),
-    ESPTimeCastSensorDescription(
-        key="sunset",
-        translation_key="sunset",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda s: _fmt_time(s.weather.sunset),
-    ),
-    ESPTimeCastSensorDescription(
-        key="countdown_remaining",
-        translation_key="countdown_remaining",
-        device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.SECONDS,
-        value_fn=lambda s: s.countdown.remaining if s.countdown.enabled else None,
-    ),
-    ESPTimeCastSensorDescription(
-        key="glucose",
-        translation_key="glucose",
-        native_unit_of_measurement="mg/dL",
-        value_fn=lambda s: s.nightscout.glucose if s.nightscout.active else None,
-    ),
+)
+
+# Created only when a countdown is configured.
+COUNTDOWN_SENSOR = ESPTimeCastSensorDescription(
+    key="countdown_remaining",
+    translation_key="countdown_remaining",
+    device_class=SensorDeviceClass.DURATION,
+    native_unit_of_measurement=UnitOfTime.SECONDS,
+    value_fn=lambda d: d.status.countdown.remaining,
+)
+
+# Created only when Nightscout is active.
+GLUCOSE_SENSOR = ESPTimeCastSensorDescription(
+    key="glucose",
+    translation_key="glucose",
+    native_unit_of_measurement="mg/dL",
+    value_fn=lambda d: d.status.nightscout.glucose,
 )
 
 
@@ -128,8 +122,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up ESPTimeCast sensors."""
     coordinator = entry.runtime_data
+    descriptions = list(SENSORS)
+    data = coordinator.data
+    if data.config.countdown.enabled or data.status.countdown.enabled:
+        descriptions.append(COUNTDOWN_SENSOR)
+    if data.status.nightscout.active:
+        descriptions.append(GLUCOSE_SENSOR)
     async_add_entities(
-        ESPTimeCastSensor(coordinator, description) for description in SENSORS
+        ESPTimeCastSensor(coordinator, description) for description in descriptions
     )
 
 

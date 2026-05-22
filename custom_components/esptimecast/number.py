@@ -33,7 +33,7 @@ class ESPTimeCastBrightness(ESPTimeCastEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        value = self.coordinator.data.brightness
+        value = self.coordinator.data.status.brightness
         return None if value is None else float(value)
 
     async def async_set_native_value(self, value: float) -> None:

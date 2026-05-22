@@ -42,3 +42,9 @@ def api_module() -> ModuleType:
 def status_payload() -> dict:
     """A real /status response captured from firmware 1.6.0."""
     return json.loads((_FIXTURES / "status.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def config_payload() -> dict:
+    """A real /config.json response captured from firmware 1.6.0."""
+    return json.loads((_FIXTURES / "config.json").read_text(encoding="utf-8"))
