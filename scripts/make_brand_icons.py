@@ -136,7 +136,7 @@ def save(img: Image.Image, name: str, target_long_edge: int) -> None:
 
 def main() -> None:
     icon = render(build_grid(ICON_TEXT), square=True)
-    logo = render(build_grid(LOGO_TEXT), square=False)
+    logo = render(build_grid(LOGO_TEXT), square=True)
     print("Writing brand assets:")
     save(icon, "icon.png", 256)
     save(icon, "icon@2x.png", 512)
