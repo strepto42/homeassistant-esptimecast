@@ -14,7 +14,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
 
-BRAND_DIR = Path(__file__).resolve().parent.parent / "custom_components" / "esptimecast" / "brand"
+_ROOT = Path(__file__).resolve().parent.parent
+BRAND_DIR = _ROOT / "custom_components" / "esptimecast" / "brand"
 
 # 5x7 dot-matrix glyphs.
 GLYPHS = {
@@ -24,12 +25,12 @@ GLYPHS = {
 }
 
 # Colours
-TILE = (20, 23, 28, 255)        # device charcoal
-SCREEN = (5, 7, 6, 255)         # near-black display
-OFF_DOT = (16, 26, 16, 255)     # unlit LED
-DOT = (147, 224, 36, 255)       # lit LED (yellow-green, like the photo)
-CORE = (216, 255, 143, 255)     # bright LED core
-GLOW = (120, 210, 30)           # glow tint
+TILE = (20, 23, 28, 255)  # device charcoal
+SCREEN = (5, 7, 6, 255)  # near-black display
+OFF_DOT = (16, 26, 16, 255)  # unlit LED
+DOT = (147, 224, 36, 255)  # lit LED (yellow-green, like the photo)
+CORE = (216, 255, 143, 255)  # bright LED core
+GLOW = (120, 210, 30)  # glow tint
 
 SS = 4  # supersample factor
 
@@ -71,7 +72,9 @@ def render(grid: list[list[bool]], *, square: bool) -> Image.Image:
     draw = ImageDraw.Draw(img)
 
     # Device tile (rounded).
-    draw.rounded_rectangle([0, 0, w - 1, h - 1], radius=int(0.16 * min(w, h)), fill=TILE)
+    draw.rounded_rectangle(
+        [0, 0, w - 1, h - 1], radius=int(0.16 * min(w, h)), fill=TILE
+    )
 
     # Display panel (rounded), centred.
     sx = (w - screen_w) // 2
@@ -87,9 +90,7 @@ def render(grid: list[list[bool]], *, square: bool) -> Image.Image:
     for r in range(rows):
         for c in range(cols):
             cx, cy = ox + c * cell, oy + r * cell
-            draw.ellipse(
-                [cx - dot_r, cy - dot_r, cx + dot_r, cy + dot_r], fill=OFF_DOT
-            )
+            draw.ellipse([cx - dot_r, cy - dot_r, cx + dot_r, cy + dot_r], fill=OFF_DOT)
 
     # Lit LEDs on their own layer so we can build a glow.
     lit = Image.new("RGBA", (w, h), (0, 0, 0, 0))
