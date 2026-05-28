@@ -22,7 +22,12 @@ GLYPHS = {
     "E": ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
     "S": ["01110", "10001", "10000", "01110", "00001", "10001", "01110"],
     "P": ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
+    "T": ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
+    "C": ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
 }
+
+ICON_TEXT = "ESP"
+LOGO_TEXT = "ETC"  # ESP Time Cast
 
 # Colours
 TILE = (20, 23, 28, 255)  # device charcoal
@@ -35,13 +40,13 @@ GLOW = (120, 210, 30)  # glow tint
 SS = 4  # supersample factor
 
 
-def build_grid() -> list[list[bool]]:
-    """9 rows x 17 cols: decorative dot row, blank row, then E S P."""
+def build_grid(text: str) -> list[list[bool]]:
+    """9 rows x 17 cols: decorative dot row, blank row, then 3 glyphs."""
     cols = 17
     grid = [[False] * cols for _ in range(9)]
     grid[0] = [True] * cols  # decorative top row
     x = 0
-    for letter in "ESP":
+    for letter in text:
         rows = GLYPHS[letter]
         for r, line in enumerate(rows):
             for c, bit in enumerate(line):
@@ -130,9 +135,8 @@ def save(img: Image.Image, name: str, target_long_edge: int) -> None:
 
 
 def main() -> None:
-    grid = build_grid()
-    icon = render(grid, square=True)
-    logo = render(grid, square=False)
+    icon = render(build_grid(ICON_TEXT), square=True)
+    logo = render(build_grid(LOGO_TEXT), square=False)
     print("Writing brand assets:")
     save(icon, "icon.png", 256)
     save(icon, "icon@2x.png", 512)
