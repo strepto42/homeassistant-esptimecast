@@ -22,12 +22,9 @@ GLYPHS = {
     "E": ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
     "S": ["01110", "10001", "10000", "01110", "00001", "10001", "01110"],
     "P": ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
-    "T": ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
-    "C": ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
 }
 
 ICON_TEXT = "ESP"
-LOGO_TEXT = "ETC"  # ESP Time Cast
 
 # Colours
 TILE = (20, 23, 28, 255)  # device charcoal
@@ -136,12 +133,9 @@ def save(img: Image.Image, name: str, target_long_edge: int) -> None:
 
 def main() -> None:
     icon = render(build_grid(ICON_TEXT), square=True)
-    logo = render(build_grid(LOGO_TEXT), square=True)
     print("Writing brand assets:")
     save(icon, "icon.png", 256)
     save(icon, "icon@2x.png", 512)
-    save(logo, "logo.png", 256)
-    save(logo, "logo@2x.png", 512)
 
 
 if __name__ == "__main__":
