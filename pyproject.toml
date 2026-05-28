@@ -1,6 +1,6 @@
 [project]
 name = "homeassistant-esptimecast"
-version = "0.6.0"
+version = "0.6.1"
 description = "Home Assistant integration for ESPTimeCast LED matrix clock & weather displays."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -14,7 +14,7 @@ test = ["pytest>=8", "pytest-asyncio>=0.24", "aioresponses>=0.7"]
 # Full HA integration tests. Installs `homeassistant`, which is Linux/macOS
 # oriented (uvloop etc.) — run these in CI or WSL, not native Windows.
 test-ha = ["pytest-homeassistant-custom-component>=0.13"]
-dev = ["ruff>=0.6", "mypy>=1.11"]
+dev = ["ruff>=0.6", "mypy>=1.11", "pillow>=10"]
 
 [project.urls]
 Homepage = "https://github.com/strepto42/homeassistant-esptimecast"
