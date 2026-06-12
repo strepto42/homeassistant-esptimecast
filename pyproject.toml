@@ -1,6 +1,6 @@
 [project]
 name = "homeassistant-esptimecast"
-version = "0.6.1"
+version = "0.6.2"
 description = "Home Assistant integration for ESPTimeCast LED matrix clock & weather displays."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -10,7 +10,9 @@ dependencies = ["aiohttp>=3.9"]
 
 [project.optional-dependencies]
 # Client-layer tests run anywhere (incl. Windows).
-test = ["pytest>=8", "pytest-asyncio>=0.24", "aioresponses>=0.7"]
+# aiohttp capped: 3.14 made ClientResponse require stream_writer, which
+# aioresponses (<=0.7.8) cannot construct. Lift when aioresponses supports it.
+test = ["pytest>=8", "pytest-asyncio>=0.24", "aioresponses>=0.7", "aiohttp<3.14"]
 # Full HA integration tests. Installs `homeassistant`, which is Linux/macOS
 # oriented (uvloop etc.) — run these in CI or WSL, not native Windows.
 test-ha = ["pytest-homeassistant-custom-component>=0.13"]
