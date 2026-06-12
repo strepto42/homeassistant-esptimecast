@@ -1,6 +1,6 @@
-"""Generate ESPTimeCast brand images (LED dot-matrix "ESP").
+"""Generate ESPTimeCast brand images (LED dot-matrix).
 
-Renders a green dot-matrix display showing "ESP" — modelled on the device's
+Renders a green dot-matrix display showing the brand letters — modelled on the device's
 MAX7219 8x32 matrix (a decorative top row of dots above the letters) — into
 custom_components/esptimecast/brand/ as the icon/logo PNGs Home Assistant's
 brands proxy serves directly from a custom integration.
@@ -22,9 +22,11 @@ GLYPHS = {
     "E": ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
     "S": ["01110", "10001", "10000", "01110", "00001", "10001", "01110"],
     "P": ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
+    "T": ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
+    "C": ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
 }
 
-ICON_TEXT = "ESP"
+ICON_TEXT = "ETC"  # ESP Time Cast
 
 # Colours
 TILE = (20, 23, 28, 255)  # device charcoal
